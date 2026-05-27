@@ -12,5 +12,14 @@ export const app = express();
 app.use(helmet());
 app.use(cors({ origin: env.APP_ORIGIN }));
 app.use(express.json());
+
+app.get(`/api/${env.API_VERSION}/health`, (_request, response) => {
+  response.json({
+    status: 'ok',
+    service: 'uniconnect-api',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use(`/api/${env.API_VERSION}`, tenantContext, routes);
 app.use(errorHandler);
