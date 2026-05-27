@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { tenants } from '../data/mock-store';
-import { HttpError } from '../shared/http-error';
+import { TenantRepository } from '../modules/tenants/tenant.repository';
 import { Tenant } from '../shared/types';
 
 declare global {
@@ -12,18 +11,18 @@ declare global {
   }
 }
 
-export function tenantContext(
+const tenantRepository = new TenantRepository();
+
+export async function tenantContext(
   request: Request,
   _response: Response,
   next: NextFunction,
 ) {
-  const slug = request.header('x-tenant-slug') ?? 'universidade-norte';
-  const tenant = tenants.find((item) => item.slug === slug);
-
-  if (!tenant) {
-    throw new HttpError(404, 'Instituição não encontrada.');
+  try {
+    const slug = request.header('x-tenant-slug') ?? 'universidade-norte';
+    request.tenant = await tenantRepository.findBySlug(slug);
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  request.tenant = tenant;
-  next();
 }

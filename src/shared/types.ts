@@ -16,6 +16,7 @@ export type Tenant = {
 export type AppUser = {
   id: string;
   tenantId: string;
+  authUserId: string;
   name: string;
   email: string;
   role: UserRole;
