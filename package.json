@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "setup:supabase": "tsx scripts/setup-supabase.ts",
+    "test:auth": "tsx scripts/auth-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
