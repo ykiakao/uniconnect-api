@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, User } from '@supabase/supabase-js';
 import { Client } from 'pg';
 
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
@@ -36,8 +36,30 @@ function createDbClient() {
   });
 }
 
+async function findAuthUserByEmail(email: string): Promise<User | null> {
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) throw error;
+
+    const user = data.users.find(
+      (candidate) => candidate.email?.toLowerCase() === email.toLowerCase(),
+    );
+
+    if (user) return user;
+    if (data.users.length < perPage) return null;
+    page += 1;
+  }
+}
+
 async function ensureAuthUser(email: string, password: string) {
-  const { error } = await supabase.auth.admin.createUser({
+  const { data, error } = await supabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -48,19 +70,123 @@ async function ensureAuthUser(email: string, password: string) {
   }
 
   console.log(`Auth user pronto: ${email}`);
+  return data.user ?? (await findAuthUserByEmail(email));
+}
+
+async function runApiOnlySetup(
+  demoUsers: Array<{ email: string; password: string }>,
+) {
+  const authUsers = new Map<string, User>();
+
+  for (const user of demoUsers) {
+    const authUser = await ensureAuthUser(user.email, user.password);
+    if (!authUser) {
+      throw new Error(`Auth user nao encontrado apos criacao: ${user.email}`);
+    }
+    authUsers.set(user.email, authUser);
+  }
+
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .upsert(
+      {
+        name: 'Universidade Norte',
+        slug: 'universidade-norte',
+        plan: 'growth',
+        status: 'trialing',
+        active_users: 384,
+      },
+      { onConflict: 'slug' },
+    )
+    .select('id')
+    .single();
+
+  if (tenantError || !tenant) {
+    throw new Error(
+      `Nao foi possivel preparar tenant: ${tenantError?.message}`,
+    );
+  }
+
+  const appUsers = [
+    {
+      tenant_id: tenant.id,
+      auth_user_id: authUsers.get('aluno@uni.com')!.id,
+      name: 'Lucas Oliveira',
+      email: 'aluno@uni.com',
+      role: 'student',
+      course: 'Engenharia de Software',
+      registration: '2024021845',
+      semester: 4,
+    },
+    {
+      tenant_id: tenant.id,
+      auth_user_id: authUsers.get('professor@uni.com')!.id,
+      name: 'Marina Costa',
+      email: 'professor@uni.com',
+      role: 'teacher',
+      course: 'Engenharia de Software',
+    },
+    {
+      tenant_id: tenant.id,
+      auth_user_id: authUsers.get('coordenador@uni.com')!.id,
+      name: 'Patricia Almeida',
+      email: 'coordenador@uni.com',
+      role: 'admin',
+      course: 'Engenharia de Software',
+    },
+    {
+      tenant_id: tenant.id,
+      auth_user_id: authUsers.get('dono@uni.com')!.id,
+      name: 'Rafael Andrade',
+      email: 'dono@uni.com',
+      role: 'admin',
+    },
+  ];
+
+  const { error: usersError } = await supabase
+    .from('app_users')
+    .upsert(appUsers, { onConflict: 'tenant_id,email' });
+
+  if (usersError) {
+    throw new Error(
+      `Nao foi possivel preparar usuarios administrativos: ${usersError.message}`,
+    );
+  }
+
+  console.log('Supabase configurado via API para login administrativo.');
 }
 
 async function main() {
+  const demoUsers = [
+    {
+      email: 'aluno@uni.com',
+      password: process.env.DEMO_STUDENT_PASSWORD ?? '123456',
+    },
+    {
+      email: 'professor@uni.com',
+      password: process.env.DEMO_TEACHER_PASSWORD ?? '123456',
+    },
+    {
+      email: 'coordenador@uni.com',
+      password: process.env.DEMO_COORDINATOR_PASSWORD ?? '123456',
+    },
+    {
+      email: 'dono@uni.com',
+      password: process.env.DEMO_OWNER_PASSWORD ?? '123456',
+    },
+  ];
+
   if (process.env.SETUP_AUTH_ONLY === 'true') {
-    await ensureAuthUser(
-      'aluno@uni.com',
-      process.env.DEMO_STUDENT_PASSWORD ?? '123456',
-    );
-    await ensureAuthUser(
-      'professor@uni.com',
-      process.env.DEMO_TEACHER_PASSWORD ?? '123456',
-    );
+    for (const user of demoUsers) {
+      await ensureAuthUser(user.email, user.password);
+    }
+
     console.log('Usuários Auth configurados.');
+    return;
+  }
+
+  if (process.env.SETUP_API_ONLY === 'true') {
+    await runApiOnlySetup(demoUsers);
     return;
   }
 
@@ -75,14 +201,10 @@ async function main() {
     }
 
     await runSqlFile('schema.sql');
-    await ensureAuthUser(
-      'aluno@uni.com',
-      process.env.DEMO_STUDENT_PASSWORD ?? '123456',
-    );
-    await ensureAuthUser(
-      'professor@uni.com',
-      process.env.DEMO_TEACHER_PASSWORD ?? '123456',
-    );
+    for (const user of demoUsers) {
+      await ensureAuthUser(user.email, user.password);
+    }
+
     await runSqlFile('seed.sql');
     console.log('Supabase configurado para o MVP UniConnect.');
   } finally {

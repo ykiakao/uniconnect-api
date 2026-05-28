@@ -1,6 +1,9 @@
 import { createSupabaseAnonClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
+import { UserRole } from '../../shared/types';
 import { AuthRepository } from './auth.repository';
+
+const adminRoles = new Set<UserRole>(['admin', 'coordinator', 'owner']);
 
 export class AuthService {
   private readonly supabase = createSupabaseAnonClient();
@@ -33,6 +36,23 @@ export class AuthService {
     };
   }
 
+  async loginAdmin(params: {
+    email: string;
+    password: string;
+    tenantId: string;
+  }) {
+    const session = await this.login(params);
+
+    if (!adminRoles.has(session.user.role)) {
+      throw new HttpError(
+        403,
+        'Acesso administrativo restrito a coordenadores e mantenedores.',
+      );
+    }
+
+    return session;
+  }
+
   async findUserByAccessToken(params: {
     accessToken: string;
     tenantId: string;
@@ -49,5 +69,21 @@ export class AuthService {
       authUserId: data.user.id,
       tenantId: params.tenantId,
     });
+  }
+
+  async findAdminUserByAccessToken(params: {
+    accessToken: string;
+    tenantId: string;
+  }) {
+    const user = await this.findUserByAccessToken(params);
+
+    if (!adminRoles.has(user.role)) {
+      throw new HttpError(
+        403,
+        'Sessao sem permissao administrativa.',
+      );
+    }
+
+    return user;
   }
 }

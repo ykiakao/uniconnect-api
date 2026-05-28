@@ -9,6 +9,8 @@ on conflict (slug) do update set
 -- Before running the inserts below, create these users in Supabase Auth:
 -- aluno@uni.com / 123456
 -- professor@uni.com / 123456
+-- coordenador@uni.com / 123456
+-- dono@uni.com / 123456
 --
 -- Then replace the subqueries if needed, or keep them if the Auth users
 -- already exist with the same e-mails.
@@ -66,3 +68,48 @@ on conflict (tenant_id, email) do update set
   name = excluded.name,
   role = excluded.role,
   course = excluded.course;
+
+insert into public.app_users (
+  tenant_id,
+  auth_user_id,
+  name,
+  email,
+  role,
+  course
+)
+select
+  tenants.id,
+  auth_users.id,
+  'Patricia Almeida',
+  'coordenador@uni.com',
+  'coordinator',
+  'Engenharia de Software'
+from public.tenants
+join auth.users auth_users on auth_users.email = 'coordenador@uni.com'
+where tenants.slug = 'universidade-norte'
+on conflict (tenant_id, email) do update set
+  auth_user_id = excluded.auth_user_id,
+  name = excluded.name,
+  role = excluded.role,
+  course = excluded.course;
+
+insert into public.app_users (
+  tenant_id,
+  auth_user_id,
+  name,
+  email,
+  role
+)
+select
+  tenants.id,
+  auth_users.id,
+  'Rafael Andrade',
+  'dono@uni.com',
+  'owner'
+from public.tenants
+join auth.users auth_users on auth_users.email = 'dono@uni.com'
+where tenants.slug = 'universidade-norte'
+on conflict (tenant_id, email) do update set
+  auth_user_id = excluded.auth_user_id,
+  name = excluded.name,
+  role = excluded.role;

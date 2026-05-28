@@ -81,6 +81,26 @@ copy .env.example .env
 
 Configure o arquivo `.env` com as chaves do Supabase antes de rodar a API.
 
+Para desenvolvimento local, rode a API na sua maquina e aponte para o mesmo projeto Supabase usado no Railway. Copie do Railway ou do painel do Supabase:
+
+```text
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+Sem essas variaveis a API nao inicializa, porque tenant e autenticacao dependem do Supabase.
+
+Se a `SUPABASE_DB_URL` ainda nao estiver correta, mas as chaves HTTP do Supabase estiverem funcionando, voce pode preparar os usuarios e vinculos basicos via API:
+
+```powershell
+$env:SETUP_API_ONLY='true'
+npm run setup:supabase
+Remove-Item Env:\SETUP_API_ONLY
+```
+
+Esse modo cria os usuarios demo no Supabase Auth e vincula `coordenador@uni.com` e `dono@uni.com` ao tenant com permissao administrativa.
+
 ---
 
 ## Variáveis de Ambiente

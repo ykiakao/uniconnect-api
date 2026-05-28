@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'teacher' | 'admin';
+export type UserRole = 'student' | 'teacher' | 'admin' | 'coordinator' | 'owner';
 
 export type SubscriptionPlan = 'starter' | 'growth' | 'enterprise';
 

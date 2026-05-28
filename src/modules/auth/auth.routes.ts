@@ -48,6 +48,31 @@ authRoutes.post('/login', async (request, response, next) => {
   }
 });
 
+authRoutes.post('/admin/login', async (request, response, next) => {
+  try {
+    if (!request.tenant) {
+      throw new HttpError(400, 'Tenant nÃ£o carregado.');
+    }
+
+    const credentials = loginSchema.parse(request.body);
+    const session = await authService.loginAdmin({
+      email: credentials.email.trim().toLowerCase(),
+      password: credentials.password,
+      tenantId: request.tenant.id,
+    });
+
+    response.json({
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAt: session.expiresAt,
+      user: session.user,
+      tenant: request.tenant,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRoutes.get('/me', async (request, response, next) => {
   try {
     if (!request.tenant) {
@@ -56,6 +81,27 @@ authRoutes.get('/me', async (request, response, next) => {
 
     const accessToken = getBearerToken(request.header('authorization'));
     const user = await authService.findUserByAccessToken({
+      accessToken,
+      tenantId: request.tenant.id,
+    });
+
+    response.json({
+      user,
+      tenant: request.tenant,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRoutes.get('/admin/me', async (request, response, next) => {
+  try {
+    if (!request.tenant) {
+      throw new HttpError(400, 'Tenant nÃ£o carregado.');
+    }
+
+    const accessToken = getBearerToken(request.header('authorization'));
+    const user = await authService.findAdminUserByAccessToken({
       accessToken,
       tenantId: request.tenant.id,
     });

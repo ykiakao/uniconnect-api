@@ -19,7 +19,7 @@ create table if not exists public.app_users (
   auth_user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   email text not null,
-  role text not null check (role in ('student', 'teacher', 'admin')),
+  role text not null check (role in ('student', 'teacher', 'admin', 'coordinator', 'owner')),
   course text,
   registration text,
   semester integer,
@@ -28,6 +28,13 @@ create table if not exists public.app_users (
   unique (tenant_id, auth_user_id),
   unique (tenant_id, email)
 );
+
+alter table public.app_users
+  drop constraint if exists app_users_role_check;
+
+alter table public.app_users
+  add constraint app_users_role_check
+  check (role in ('student', 'teacher', 'admin', 'coordinator', 'owner'));
 
 create table if not exists public.courses (
   id uuid primary key default gen_random_uuid(),
@@ -84,6 +91,14 @@ alter table public.classes enable row level security;
 alter table public.activities enable row level security;
 alter table public.grades enable row level security;
 alter table public.messages enable row level security;
+
+drop policy if exists "service role full access tenants" on public.tenants;
+drop policy if exists "service role full access app users" on public.app_users;
+drop policy if exists "service role full access courses" on public.courses;
+drop policy if exists "service role full access classes" on public.classes;
+drop policy if exists "service role full access activities" on public.activities;
+drop policy if exists "service role full access grades" on public.grades;
+drop policy if exists "service role full access messages" on public.messages;
 
 create policy "service role full access tenants"
   on public.tenants for all
