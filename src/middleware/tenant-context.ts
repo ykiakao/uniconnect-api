@@ -19,7 +19,13 @@ export async function tenantContext(
   next: NextFunction,
 ) {
   try {
-    const slug = request.header('x-tenant-slug') ?? 'universidade-norte';
+    const slug = request.header('x-tenant-slug')?.trim();
+
+    if (!slug) {
+      next();
+      return;
+    }
+
     request.tenant = await tenantRepository.findBySlug(slug);
     next();
   } catch (error) {

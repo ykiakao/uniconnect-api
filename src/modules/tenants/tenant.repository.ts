@@ -33,7 +33,12 @@ export class TenantRepository {
       .single<TenantRow>();
 
     if (error || !data) {
-      throw new HttpError(404, 'Instituição não encontrada.', error?.message);
+      throw new HttpError(
+        404,
+        'TENANT_NOT_FOUND',
+        'Instituição não encontrada',
+        error?.message,
+      );
     }
 
     return mapTenant(data);

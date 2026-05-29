@@ -17,7 +17,11 @@ function getBearerToken(authorizationHeader?: string) {
   const [scheme, token] = authorizationHeader?.split(' ') ?? [];
 
   if (scheme !== 'Bearer' || !token) {
-    throw new HttpError(401, 'Token de autenticação ausente.');
+    throw new HttpError(
+      401,
+      'AUTH_TOKEN_REQUIRED',
+      'Token de autenticação ausente.',
+    );
   }
 
   return token;
@@ -26,7 +30,7 @@ function getBearerToken(authorizationHeader?: string) {
 authRoutes.post('/login', async (request, response, next) => {
   try {
     if (!request.tenant) {
-      throw new HttpError(400, 'Tenant não carregado.');
+      throw new HttpError(400, 'TENANT_REQUIRED', 'Instituição não informada');
     }
 
     const credentials = loginSchema.parse(request.body);
@@ -34,6 +38,7 @@ authRoutes.post('/login', async (request, response, next) => {
       email: credentials.email.trim().toLowerCase(),
       password: credentials.password,
       tenantId: request.tenant.id,
+      tenantSlug: request.tenant.slug,
     });
 
     response.json({
@@ -41,7 +46,6 @@ authRoutes.post('/login', async (request, response, next) => {
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
       user: session.user,
-      tenant: request.tenant,
     });
   } catch (error) {
     next(error);
@@ -51,7 +55,7 @@ authRoutes.post('/login', async (request, response, next) => {
 authRoutes.post('/admin/login', async (request, response, next) => {
   try {
     if (!request.tenant) {
-      throw new HttpError(400, 'Tenant nÃ£o carregado.');
+      throw new HttpError(400, 'TENANT_REQUIRED', 'Instituição não informada');
     }
 
     const credentials = loginSchema.parse(request.body);
@@ -59,6 +63,7 @@ authRoutes.post('/admin/login', async (request, response, next) => {
       email: credentials.email.trim().toLowerCase(),
       password: credentials.password,
       tenantId: request.tenant.id,
+      tenantSlug: request.tenant.slug,
     });
 
     response.json({
@@ -66,7 +71,6 @@ authRoutes.post('/admin/login', async (request, response, next) => {
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
       user: session.user,
-      tenant: request.tenant,
     });
   } catch (error) {
     next(error);
@@ -75,20 +79,19 @@ authRoutes.post('/admin/login', async (request, response, next) => {
 
 authRoutes.get('/me', async (request, response, next) => {
   try {
+    const accessToken = getBearerToken(request.header('authorization'));
+
     if (!request.tenant) {
-      throw new HttpError(400, 'Tenant não carregado.');
+      throw new HttpError(400, 'TENANT_REQUIRED', 'Instituição não informada');
     }
 
-    const accessToken = getBearerToken(request.header('authorization'));
     const user = await authService.findUserByAccessToken({
       accessToken,
       tenantId: request.tenant.id,
+      tenantSlug: request.tenant.slug,
     });
 
-    response.json({
-      user,
-      tenant: request.tenant,
-    });
+    response.json(user);
   } catch (error) {
     next(error);
   }
@@ -96,21 +99,45 @@ authRoutes.get('/me', async (request, response, next) => {
 
 authRoutes.get('/admin/me', async (request, response, next) => {
   try {
+    const accessToken = getBearerToken(request.header('authorization'));
+
     if (!request.tenant) {
-      throw new HttpError(400, 'Tenant nÃ£o carregado.');
+      throw new HttpError(400, 'TENANT_REQUIRED', 'Instituição não informada');
     }
 
-    const accessToken = getBearerToken(request.header('authorization'));
     const user = await authService.findAdminUserByAccessToken({
       accessToken,
       tenantId: request.tenant.id,
+      tenantSlug: request.tenant.slug,
     });
 
-    response.json({
-      user,
-      tenant: request.tenant,
-    });
+    response.json(user);
   } catch (error) {
     next(error);
   }
+});
+
+authRoutes.post('/logout', async (request, response, next) => {
+  try {
+    const accessToken = getBearerToken(request.header('authorization'));
+
+    try {
+      await authService.logout(accessToken);
+    } catch {
+      // Logout is intentionally idempotent for already invalid tokens.
+    }
+
+    response.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRoutes.post('/refresh', (_request, response) => {
+  response.status(501).json({
+    error: {
+      code: 'NOT_IMPLEMENTED',
+      message: 'Refresh token ainda não implementado',
+    },
+  });
 });

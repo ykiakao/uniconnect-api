@@ -43,7 +43,7 @@ async function main() {
       'x-tenant-slug': tenantSlug,
     };
 
-    const missingToken = await fetch(`${baseUrl}/auth/me`, { headers });
+    const missingToken = await fetch(`${baseUrl}/auth/me`);
     await assertStatus(missingToken, 401, 'token ausente');
 
     const invalidToken = await fetch(`${baseUrl}/auth/me`, {
@@ -63,6 +63,19 @@ async function main() {
       }),
     });
     await assertStatus(invalidLogin, 401, 'login invalido');
+    const invalidLoginBody = await readJson(invalidLogin);
+    assert.equal(invalidLoginBody.error.code, 'INVALID_CREDENTIALS');
+
+    const missingTenantLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    await assertStatus(missingTenantLogin, 400, 'tenant ausente');
+    const missingTenantLoginBody = await readJson(missingTenantLogin);
+    assert.equal(missingTenantLoginBody.error.code, 'TENANT_REQUIRED');
 
     const login = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
@@ -72,8 +85,11 @@ async function main() {
     await assertStatus(login, 200, 'login valido');
     const loginBody = await readJson(login);
     assert.equal(loginBody.user.email, email.toLowerCase());
-    assert.equal(loginBody.tenant.slug, tenantSlug);
+    assert.equal(loginBody.user.tenantSlug, tenantSlug);
+    assert.ok(loginBody.user.role);
     assert.ok(loginBody.accessToken);
+    assert.ok(loginBody.refreshToken);
+    assert.ok(loginBody.expiresAt);
 
     const me = await fetch(`${baseUrl}/auth/me`, {
       headers: {
@@ -83,8 +99,23 @@ async function main() {
     });
     await assertStatus(me, 200, 'me valido');
     const meBody = await readJson(me);
-    assert.equal(meBody.user.email, email.toLowerCase());
-    assert.equal(meBody.tenant.slug, tenantSlug);
+    assert.equal(meBody.email, email.toLowerCase());
+    assert.equal(meBody.tenantSlug, tenantSlug);
+
+    const logout = await fetch(`${baseUrl}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${loginBody.accessToken}`,
+      },
+    });
+    await assertStatus(logout, 204, 'logout valido');
+
+    const refresh = await fetch(`${baseUrl}/auth/refresh`, {
+      method: 'POST',
+    });
+    await assertStatus(refresh, 501, 'refresh stub');
+    const refreshBody = await readJson(refresh);
+    assert.equal(refreshBody.error.code, 'NOT_IMPLEMENTED');
   } finally {
     server.close();
   }

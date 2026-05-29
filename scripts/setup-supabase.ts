@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createClient, User } from '@supabase/supabase-js';
@@ -200,7 +200,23 @@ async function main() {
       console.log(`SQL executado: ${fileName}`);
     }
 
+    async function runMigrations() {
+      const migrationsPath = join(process.cwd(), 'supabase', 'migrations');
+      if (!existsSync(migrationsPath)) return;
+
+      const migrations = readdirSync(migrationsPath)
+        .filter((fileName) => fileName.endsWith('.sql'))
+        .sort();
+
+      for (const migration of migrations) {
+        const sql = readFileSync(join(migrationsPath, migration), 'utf8');
+        await db.query(sql);
+        console.log(`Migration executada: ${migration}`);
+      }
+    }
+
     await runSqlFile('schema.sql');
+    await runMigrations();
     for (const user of demoUsers) {
       await ensureAuthUser(user.email, user.password);
     }

@@ -1,7 +1,6 @@
 import { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 
-import { env } from '../config/env';
 import { HttpError } from '../shared/http-error';
 
 export const errorHandler: ErrorRequestHandler = (
@@ -12,25 +11,28 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (error instanceof ZodError) {
     response.status(400).json({
-      error: 'validation_error',
-      message: 'Dados inválidos.',
-      details: error.flatten(),
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Dados inválidos.',
+      },
     });
     return;
   }
 
   if (error instanceof HttpError) {
     response.status(error.statusCode).json({
-      error: 'request_error',
-      message: error.message,
-      details: error.details,
+      error: {
+        code: error.code,
+        message: error.message,
+      },
     });
     return;
   }
 
   response.status(500).json({
-    error: 'internal_error',
-    message: 'Erro interno do servidor.',
-    details: env.NODE_ENV === 'development' ? String(error) : undefined,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'Erro interno do servidor.',
+    },
   });
 };

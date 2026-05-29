@@ -40,39 +40,44 @@ create table if not exists public.courses (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   name text not null,
-  created_at timestamptz not null default now()
+  description text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.classes (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  course_id uuid references public.courses(id) on delete set null,
+  course_id uuid not null references public.courses(id) on delete cascade,
   name text not null,
+  teacher_id uuid references auth.users(id),
   semester integer,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  class_id uuid references public.classes(id) on delete set null,
+  class_id uuid not null references public.classes(id) on delete cascade,
   title text not null,
   description text,
-  due_at timestamptz,
-  priority text not null default 'normal'
-    check (priority in ('normal', 'important', 'critical')),
-  created_at timestamptz not null default now()
+  due_date timestamptz,
+  type text not null default 'assignment',
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.grades (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  student_id uuid not null references public.app_users(id) on delete cascade,
-  class_id uuid references public.classes(id) on delete set null,
-  label text not null,
-  value numeric(4, 2) not null,
-  weight numeric(4, 2) not null default 1,
-  created_at timestamptz not null default now()
+  activity_id uuid not null references public.activities(id) on delete cascade,
+  student_id uuid not null references auth.users(id) on delete cascade,
+  grade numeric(5, 2),
+  feedback text,
+  graded_at timestamptz,
+  graded_by uuid references auth.users(id)
 );
 
 create table if not exists public.messages (
