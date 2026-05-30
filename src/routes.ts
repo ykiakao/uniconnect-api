@@ -15,6 +15,10 @@ import {
   studentGradesRoutes,
 } from './modules/grades/grades.routes';
 import {
+  publicInvitesRoutes,
+  tenantInvitesRoutes,
+} from './modules/invites/invites.routes';
+import {
   globalReportsRoutes,
   tenantReportsRoutes,
 } from './modules/reports/reports.routes';
@@ -25,6 +29,8 @@ export const routes = Router();
 
 routes.use('/auth', authRoutes);
 routes.use('/admin', globalReportsRoutes);
+routes.use('/invites', publicInvitesRoutes);
+routes.use('/tenants/:slug/invites', tenantInvitesRoutes);
 routes.use('/tenants/:slug/classes/:classId/activities', classActivitiesRoutes);
 routes.use('/tenants/:slug/courses/:courseId/classes', courseClassesRoutes);
 routes.use('/tenants/:slug/activities/:activityId/grades', activityGradesRoutes);

@@ -9,8 +9,11 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "setup:supabase": "tsx scripts/setup-supabase.ts",
+    "seed:demo": "tsx scripts/seed-demo-university.ts",
     "test:auth": "tsx scripts/auth-smoke.ts",
     "test:academic": "tsx scripts/academic-smoke.ts",
+    "test:invites": "tsx scripts/invite-smoke.ts",
+    "test:seed-demo": "tsx scripts/seed-demo-smoke.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"

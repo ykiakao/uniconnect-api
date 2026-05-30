@@ -110,13 +110,14 @@ Esse modo cria os usuarios demo no Supabase Auth e vincula `coordenador@uni.com`
 | `NODE_ENV` | Ambiente da aplicação |
 | `PORT` | Porta local da API |
 | `API_VERSION` | Versão exposta nas rotas |
-| `APP_ORIGIN` | Origem permitida no CORS |
+| `APP_ORIGIN` | Lista de origens permitidas no CORS, separadas por virgula. Inclua a origem do painel web, como `http://localhost:3000` ou `http://127.0.0.1:5173`. |
 | `SUPABASE_URL` | URL do projeto Supabase |
 | `SUPABASE_ANON_KEY` | Chave pública anon usada no login |
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave privada usada apenas no backend |
 | `SUPABASE_DB_URL` | URL de conexão usada por scripts |
 | `DEMO_STUDENT_PASSWORD` | Senha do aluno demo |
 | `DEMO_TEACHER_PASSWORD` | Senha do professor demo |
+| `DEMO_UNIVERSITY_PASSWORD` | Senha padrao dos usuarios do seed demo da universidade |
 
 ---
 
@@ -175,6 +176,7 @@ Execute os arquivos SQL no SQL Editor do Supabase:
 | ------- | ---------- |
 | `supabase/schema.sql` | Cria tabelas, constraints e políticas RLS |
 | `supabase/seed.sql` | Insere tenant demo e vincula usuários do Supabase Auth |
+| `supabase/seed_demo.sql` | Popula uma universidade demo com cursos, turmas, atividades, notas e mensagens ficticias |
 
 Usuários demo esperados:
 
@@ -182,6 +184,27 @@ Usuários demo esperados:
 | ------ | ------ | ----- |
 | Aluno | `aluno@uni.com` | `123456` |
 | Professor | `professor@uni.com` | `123456` |
+
+Para preparar a base realista da demo do TCC, configure `SUPABASE_DB_URL`
+e rode:
+
+```bash
+npm run seed:demo
+```
+
+O script cria usuarios ficticios no Supabase Auth e executa
+`supabase/seed_demo.sql`. A senha padrao local e `Demo@2026`, configuravel
+por `DEMO_UNIVERSITY_PASSWORD`.
+
+Usuarios principais do seed demo:
+
+| Perfil | E-mail |
+| ------ | ------ |
+| Admin | `admin@uniconnect.app` |
+| Gestor | `gestor@universidade-norte.edu.br` |
+| Coordenador | `coordenador@universidade-norte.edu.br` |
+| Professor | `professor.eng@universidade-norte.edu.br` |
+| Aluno | `aluno01@universidade-norte.edu.br` |
 
 ---
 

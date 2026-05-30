@@ -80,6 +80,17 @@ create table if not exists public.grades (
   graded_by uuid references auth.users(id)
 );
 
+create table if not exists public.invites (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  code text not null unique,
+  role text not null check (role in ('student', 'teacher', 'coordinator', 'admin')),
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -95,6 +106,7 @@ alter table public.courses enable row level security;
 alter table public.classes enable row level security;
 alter table public.activities enable row level security;
 alter table public.grades enable row level security;
+alter table public.invites enable row level security;
 alter table public.messages enable row level security;
 
 drop policy if exists "service role full access tenants" on public.tenants;
@@ -103,6 +115,7 @@ drop policy if exists "service role full access courses" on public.courses;
 drop policy if exists "service role full access classes" on public.classes;
 drop policy if exists "service role full access activities" on public.activities;
 drop policy if exists "service role full access grades" on public.grades;
+drop policy if exists "service role full access invites" on public.invites;
 drop policy if exists "service role full access messages" on public.messages;
 
 create policy "service role full access tenants"
@@ -132,6 +145,11 @@ create policy "service role full access activities"
 
 create policy "service role full access grades"
   on public.grades for all
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+create policy "service role full access invites"
+  on public.invites for all
   using (auth.role() = 'service_role')
   with check (auth.role() = 'service_role');
 
