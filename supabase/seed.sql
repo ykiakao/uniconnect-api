@@ -1,5 +1,5 @@
 insert into public.tenants (name, slug, plan, status, active_users)
-values ('Universidade Norte', 'universidade-norte', 'growth', 'trialing', 384)
+values ('EduKMais', 'edukmais', 'growth', 'trialing', 384)
 on conflict (slug) do update set
   name = excluded.name,
   plan = excluded.plan,
@@ -7,10 +7,10 @@ on conflict (slug) do update set
   active_users = excluded.active_users;
 
 -- Before running the inserts below, create these users in Supabase Auth:
--- aluno@uni.com / 123456
--- professor@uni.com / 123456
--- coordenador@uni.com / 123456
--- dono@uni.com / 123456
+-- aluno@edukmais.edu.br / 123456
+-- professor@edukmais.edu.br / 123456
+-- coordenador@edukmais.edu.br / 123456
+-- dono@edukmais.edu.br / 123456
 --
 -- Then replace the subqueries if needed, or keep them if the Auth users
 -- already exist with the same e-mails.
@@ -29,14 +29,14 @@ select
   tenants.id,
   auth_users.id,
   'Lucas Oliveira',
-  'aluno@uni.com',
+  'aluno@edukmais.edu.br',
   'student',
   'Engenharia de Software',
   '2024021845',
   4
 from public.tenants
-join auth.users auth_users on auth_users.email = 'aluno@uni.com'
-where tenants.slug = 'universidade-norte'
+join auth.users auth_users on auth_users.email = 'aluno@edukmais.edu.br'
+where tenants.slug = 'edukmais'
 on conflict (tenant_id, email) do update set
   auth_user_id = excluded.auth_user_id,
   name = excluded.name,
@@ -57,12 +57,12 @@ select
   tenants.id,
   auth_users.id,
   'Marina Costa',
-  'professor@uni.com',
+  'professor@edukmais.edu.br',
   'teacher',
   'Engenharia de Software'
 from public.tenants
-join auth.users auth_users on auth_users.email = 'professor@uni.com'
-where tenants.slug = 'universidade-norte'
+join auth.users auth_users on auth_users.email = 'professor@edukmais.edu.br'
+where tenants.slug = 'edukmais'
 on conflict (tenant_id, email) do update set
   auth_user_id = excluded.auth_user_id,
   name = excluded.name,
@@ -81,12 +81,12 @@ select
   tenants.id,
   auth_users.id,
   'Patricia Almeida',
-  'coordenador@uni.com',
+  'coordenador@edukmais.edu.br',
   'coordinator',
   'Engenharia de Software'
 from public.tenants
-join auth.users auth_users on auth_users.email = 'coordenador@uni.com'
-where tenants.slug = 'universidade-norte'
+join auth.users auth_users on auth_users.email = 'coordenador@edukmais.edu.br'
+where tenants.slug = 'edukmais'
 on conflict (tenant_id, email) do update set
   auth_user_id = excluded.auth_user_id,
   name = excluded.name,
@@ -104,11 +104,11 @@ select
   tenants.id,
   auth_users.id,
   'Rafael Andrade',
-  'dono@uni.com',
+  'dono@edukmais.edu.br',
   'owner'
 from public.tenants
-join auth.users auth_users on auth_users.email = 'dono@uni.com'
-where tenants.slug = 'universidade-norte'
+join auth.users auth_users on auth_users.email = 'dono@edukmais.edu.br'
+where tenants.slug = 'edukmais'
 on conflict (tenant_id, email) do update set
   auth_user_id = excluded.auth_user_id,
   name = excluded.name,

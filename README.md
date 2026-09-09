@@ -99,7 +99,7 @@ npm run setup:supabase
 Remove-Item Env:\SETUP_API_ONLY
 ```
 
-Esse modo cria os usuarios demo no Supabase Auth e vincula `coordenador@uni.com` e `dono@uni.com` ao tenant com permissao administrativa.
+Esse modo cria os usuarios demo no Supabase Auth e vincula `coordenador@edukmais.edu.br` e `dono@edukmais.edu.br` ao tenant com permissao administrativa.
 
 ---
 
@@ -150,6 +150,62 @@ npm run start
 
 ---
 
+## Deploy no Render
+
+O backend esta preparado para subir como Web Service no Render usando o arquivo
+`render.yaml`.
+
+### Opcao A: Blueprint
+
+1. Envie a pasta `uniconnect-api` para o GitHub.
+2. No Render, escolha **New > Blueprint**.
+3. Selecione o repositorio da API.
+4. Confirme o servico `uniconnect-api`.
+5. Preencha as variaveis marcadas como `sync: false`.
+
+### Opcao B: Web Service manual
+
+Use estas configuracoes:
+
+| Campo | Valor |
+| ----- | ----- |
+| Runtime | `Node` |
+| Build Command | `npm ci && npm run build` |
+| Start Command | `npm run start` |
+| Health Check Path | `/api/v1/health` |
+
+Nao configure `PORT` manualmente. O Render injeta essa variavel
+automaticamente, e a API ja usa `process.env.PORT`.
+
+### Variaveis no Render
+
+| Variavel | Valor |
+| -------- | ----- |
+| `NODE_ENV` | `production` |
+| `HOST` | `0.0.0.0` |
+| `API_VERSION` | `v1` |
+| `APP_ORIGIN` | URL do painel/app que vai consumir a API |
+| `SUPABASE_URL` | URL do projeto Supabase |
+| `SUPABASE_ANON_KEY` | Chave anon/public do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave service role do Supabase |
+
+Depois do deploy, valide:
+
+```bash
+curl https://sua-api.onrender.com/api/v1/health
+```
+
+Resposta esperada:
+
+```json
+{
+  "status": "ok",
+  "service": "uniconnect-api"
+}
+```
+
+---
+
 ## Rotas Iniciais da API
 
 | Método | Endpoint | Descrição |
@@ -157,14 +213,29 @@ npm run start
 | GET | `/api/v1/health` | Verifica a disponibilidade da API |
 | GET | `/api/v1/tenants/current` | Retorna o tenant atual |
 | POST | `/api/v1/auth/login` | Realiza login via Supabase Auth |
+| POST | `/api/v1/tenants/:slug/users` | Cadastra usuario da instituicao com senha provisoria |
 | GET | `/api/v1/auth/me` | Retorna usuário e tenant atuais |
 
 Header de tenant usado no MVP:
 
 ```http
-x-tenant-slug: universidade-norte
+x-tenant-slug: edukmais
 Accept: application/json
 ```
+
+Cadastro administrativo de usuario:
+
+```json
+{
+  "name": "Aluno Cadastro",
+  "email": "aluno.cadastro@edukmais.edu.br",
+  "password": "Temp@123456",
+  "role": "aluno"
+}
+```
+
+A senha provisoria e usada apenas para criar o usuario no Supabase Auth e
+nao e retornada na resposta da API.
 
 ---
 
@@ -182,8 +253,8 @@ Usuários demo esperados:
 
 | Perfil | E-mail | Senha |
 | ------ | ------ | ----- |
-| Aluno | `aluno@uni.com` | `123456` |
-| Professor | `professor@uni.com` | `123456` |
+| Aluno | `aluno@edukmais.edu.br` | `123456` |
+| Professor | `professor@edukmais.edu.br` | `123456` |
 
 Para preparar a base realista da demo do TCC, configure `SUPABASE_DB_URL`
 e rode:
@@ -201,10 +272,10 @@ Usuarios principais do seed demo:
 | Perfil | E-mail |
 | ------ | ------ |
 | Admin | `admin@uniconnect.app` |
-| Gestor | `gestor@universidade-norte.edu.br` |
-| Coordenador | `coordenador@universidade-norte.edu.br` |
-| Professor | `professor.eng@universidade-norte.edu.br` |
-| Aluno | `aluno01@universidade-norte.edu.br` |
+| Gestor | `gestor@edukmais.edu.br` |
+| Coordenador | `coordenador@edukmais.edu.br` |
+| Professor | `professor.eng@edukmais.edu.br` |
+| Aluno | `aluno01@edukmais.edu.br` |
 
 ---
 

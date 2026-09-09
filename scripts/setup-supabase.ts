@@ -90,8 +90,8 @@ async function runApiOnlySetup(
     .from('tenants')
     .upsert(
       {
-        name: 'Universidade Norte',
-        slug: 'universidade-norte',
+        name: 'EduKMais',
+        slug: 'edukmais',
         plan: 'growth',
         status: 'trialing',
         active_users: 384,
@@ -108,39 +108,39 @@ async function runApiOnlySetup(
   }
 
   const appUsers = [
-    {
-      tenant_id: tenant.id,
-      auth_user_id: authUsers.get('aluno@uni.com')!.id,
-      name: 'Lucas Oliveira',
-      email: 'aluno@uni.com',
-      role: 'student',
-      course: 'Engenharia de Software',
-      registration: '2024021845',
+      {
+        tenant_id: tenant.id,
+        auth_user_id: authUsers.get('aluno@edukmais.edu.br')!.id,
+        name: 'Lucas Oliveira',
+        email: 'aluno@edukmais.edu.br',
+        role: 'student',
+        course: 'Engenharia de Software',
+        registration: '2024021845',
       semester: 4,
     },
-    {
-      tenant_id: tenant.id,
-      auth_user_id: authUsers.get('professor@uni.com')!.id,
-      name: 'Marina Costa',
-      email: 'professor@uni.com',
-      role: 'teacher',
-      course: 'Engenharia de Software',
-    },
-    {
-      tenant_id: tenant.id,
-      auth_user_id: authUsers.get('coordenador@uni.com')!.id,
-      name: 'Patricia Almeida',
-      email: 'coordenador@uni.com',
-      role: 'admin',
-      course: 'Engenharia de Software',
-    },
-    {
-      tenant_id: tenant.id,
-      auth_user_id: authUsers.get('dono@uni.com')!.id,
-      name: 'Rafael Andrade',
-      email: 'dono@uni.com',
-      role: 'admin',
-    },
+      {
+        tenant_id: tenant.id,
+        auth_user_id: authUsers.get('professor@edukmais.edu.br')!.id,
+        name: 'Marina Costa',
+        email: 'professor@edukmais.edu.br',
+        role: 'teacher',
+        course: 'Engenharia de Software',
+      },
+      {
+        tenant_id: tenant.id,
+        auth_user_id: authUsers.get('coordenador@edukmais.edu.br')!.id,
+        name: 'Patricia Almeida',
+        email: 'coordenador@edukmais.edu.br',
+        role: 'coordinator',
+        course: 'Engenharia de Software',
+      },
+      {
+        tenant_id: tenant.id,
+        auth_user_id: authUsers.get('dono@edukmais.edu.br')!.id,
+        name: 'Rafael Andrade',
+        email: 'dono@edukmais.edu.br',
+        role: 'owner',
+      },
   ];
 
   const { error: usersError } = await supabase
@@ -159,19 +159,19 @@ async function runApiOnlySetup(
 async function main() {
   const demoUsers = [
     {
-      email: 'aluno@uni.com',
+      email: 'aluno@edukmais.edu.br',
       password: process.env.DEMO_STUDENT_PASSWORD ?? '123456',
     },
     {
-      email: 'professor@uni.com',
+      email: 'professor@edukmais.edu.br',
       password: process.env.DEMO_TEACHER_PASSWORD ?? '123456',
     },
     {
-      email: 'coordenador@uni.com',
+      email: 'coordenador@edukmais.edu.br',
       password: process.env.DEMO_COORDINATOR_PASSWORD ?? '123456',
     },
     {
-      email: 'dono@uni.com',
+      email: 'dono@edukmais.edu.br',
       password: process.env.DEMO_OWNER_PASSWORD ?? '123456',
     },
   ];

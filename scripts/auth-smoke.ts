@@ -3,8 +3,8 @@ import { AddressInfo } from 'node:net';
 
 import { app } from '../src/app';
 
-const tenantSlug = process.env.AUTH_SMOKE_TENANT_SLUG ?? 'universidade-norte';
-const email = process.env.AUTH_SMOKE_EMAIL ?? 'aluno@uni.com';
+const tenantSlug = process.env.AUTH_SMOKE_TENANT_SLUG ?? 'edukmais';
+const email = process.env.AUTH_SMOKE_EMAIL ?? 'aluno@edukmais.edu.br';
 const password =
   process.env.AUTH_SMOKE_PASSWORD ??
   process.env.DEMO_STUDENT_PASSWORD ??
