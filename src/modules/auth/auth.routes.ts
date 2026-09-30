@@ -46,6 +46,7 @@ authRoutes.post('/login', async (request, response, next) => {
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
       user: session.user,
+      tenant: request.tenant,
     });
   } catch (error) {
     next(error);
@@ -71,6 +72,7 @@ authRoutes.post('/admin/login', async (request, response, next) => {
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
       user: session.user,
+      tenant: request.tenant,
     });
   } catch (error) {
     next(error);
@@ -91,7 +93,10 @@ authRoutes.get('/me', async (request, response, next) => {
       tenantSlug: request.tenant.slug,
     });
 
-    response.json(user);
+    response.json({
+      ...user,
+      tenant: request.tenant,
+    });
   } catch (error) {
     next(error);
   }
@@ -111,7 +116,10 @@ authRoutes.get('/admin/me', async (request, response, next) => {
       tenantSlug: request.tenant.slug,
     });
 
-    response.json(user);
+    response.json({
+      ...user,
+      tenant: request.tenant,
+    });
   } catch (error) {
     next(error);
   }

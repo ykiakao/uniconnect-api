@@ -6,7 +6,7 @@ const tenantSlug = 'edukmais';
 const baseUrl = '/api/v1/auth';
 
 describe('auth routes', () => {
-  it('retorna 200 com accessToken, role e tenantSlug para credenciais validas', async () => {
+  it('retorna 200 com accessToken, usuario e instituicao para credenciais validas', async () => {
     const response = await request(app)
       .post(`${baseUrl}/login`)
       .set('x-tenant-slug', tenantSlug)
@@ -19,6 +19,10 @@ describe('auth routes', () => {
     expect(response.body.accessToken).toBe('valid-student-token');
     expect(response.body.user.role).toBe('aluno');
     expect(response.body.user.tenantSlug).toBe(tenantSlug);
+    expect(response.body.tenant).toMatchObject({
+      name: 'EduKMais',
+      slug: tenantSlug,
+    });
   });
 
   it('retorna 401 INVALID_CREDENTIALS para credenciais invalidas', async () => {
@@ -47,7 +51,7 @@ describe('auth routes', () => {
     expect(JSON.stringify(response.body)).not.toContain('password');
   });
 
-  it('retorna 200 com role e tenantSlug para /me com token valido', async () => {
+  it('retorna 200 com usuario e instituicao para /me com token valido', async () => {
     const response = await request(app)
       .get(`${baseUrl}/me`)
       .set('x-tenant-slug', tenantSlug)
@@ -56,6 +60,10 @@ describe('auth routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.role).toBe('aluno');
     expect(response.body.tenantSlug).toBe(tenantSlug);
+    expect(response.body.tenant).toMatchObject({
+      name: 'EduKMais',
+      slug: tenantSlug,
+    });
   });
 
   it('retorna 401 quando /me recebe token ausente', async () => {

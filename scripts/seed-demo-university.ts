@@ -12,20 +12,32 @@ const requiredEnv = [
   'SUPABASE_DB_URL',
 ] as const;
 
-const demoPassword = process.env.DEMO_UNIVERSITY_PASSWORD ?? 'Demo@2026';
+const demoUniversityPassword =
+  process.env.DEMO_UNIVERSITY_PASSWORD ?? 'Demo@2026';
 
 const demoUsers = [
-  'admin@uniconnect.app',
-  'gestor@edukmais.edu.br',
-  'coordenador@edukmais.edu.br',
-  'professor.comp@edukmais.edu.br',
-  'professor.eng@edukmais.edu.br',
-  'professor.si@edukmais.edu.br',
-  'aluno01@edukmais.edu.br',
-  'aluno02@edukmais.edu.br',
-  'aluno03@edukmais.edu.br',
-  'aluno04@edukmais.edu.br',
-  'aluno05@edukmais.edu.br',
+  { email: 'admin@uniconnect.app', password: demoUniversityPassword },
+  { email: 'gestor@edukmais.edu.br', password: demoUniversityPassword },
+  {
+    email: 'coordenador@edukmais.edu.br',
+    password: demoUniversityPassword,
+  },
+  { email: 'professor.comp@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'professor.eng@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'professor.si@edukmais.edu.br', password: demoUniversityPassword },
+  {
+    email: 'professor@edukmais.edu.br',
+    password: process.env.DEMO_TEACHER_PASSWORD ?? '123456',
+  },
+  {
+    email: 'aluno@edukmais.edu.br',
+    password: process.env.DEMO_STUDENT_PASSWORD ?? '123456',
+  },
+  { email: 'aluno01@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'aluno02@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'aluno03@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'aluno04@edukmais.edu.br', password: demoUniversityPassword },
+  { email: 'aluno05@edukmais.edu.br', password: demoUniversityPassword },
 ];
 
 for (const key of requiredEnv) {
@@ -67,17 +79,25 @@ async function findAuthUserByEmail(email: string): Promise<User | null> {
   }
 }
 
-async function ensureAuthUser(email: string) {
+async function ensureAuthUser(params: { email: string; password: string }) {
+  const { email, password } = params;
   const existing = await findAuthUserByEmail(email);
 
   if (existing) {
-    console.log(`Auth user ja existe: ${email}`);
+    const { error } = await supabase.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+    });
+
+    if (error) throw error;
+
+    console.log(`Auth user atualizado: ${email}`);
     return;
   }
 
   const { error } = await supabase.auth.admin.createUser({
     email,
-    password: demoPassword,
+    password,
     email_confirm: true,
   });
 
@@ -87,8 +107,8 @@ async function ensureAuthUser(email: string) {
 }
 
 async function main() {
-  for (const email of demoUsers) {
-    await ensureAuthUser(email);
+  for (const user of demoUsers) {
+    await ensureAuthUser(user);
   }
 
   const db = new Client({
