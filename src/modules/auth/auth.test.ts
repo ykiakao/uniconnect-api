@@ -19,6 +19,7 @@ describe('auth routes', () => {
     expect(response.body.accessToken).toBe('valid-student-token');
     expect(response.body.user.role).toBe('aluno');
     expect(response.body.user.tenantSlug).toBe(tenantSlug);
+    expect(response.body.user.course).toBe('Curso Existente');
     expect(response.body.tenant).toMatchObject({
       name: 'EduKMais',
       slug: tenantSlug,

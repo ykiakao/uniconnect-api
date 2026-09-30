@@ -33,4 +33,5 @@ export type AuthUserResponse = {
   email: string;
   role: ApiUserRole;
   tenantSlug: string;
+  course?: string;
 };

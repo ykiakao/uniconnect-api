@@ -19,6 +19,7 @@ function toAuthUserResponse(params: {
     email: params.user.email,
     role: toApiUserRole(params.user.role),
     tenantSlug: params.tenantSlug,
+    course: params.user.course,
   };
 }
 
