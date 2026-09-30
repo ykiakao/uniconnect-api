@@ -1,4 +1,5 @@
 import { ClassesRepository } from '../classes/classes.repository';
+import { CoursesRepository } from '../courses/courses.repository';
 import { HttpError } from '../../shared/http-error';
 import { Pagination, toPaginated } from '../../shared/pagination';
 import { canManageTenant } from '../../shared/roles';
@@ -11,6 +12,7 @@ import {
 export class ActivitiesService {
   private readonly activitiesRepository = new ActivitiesRepository();
   private readonly classesRepository = new ClassesRepository();
+  private readonly coursesRepository = new CoursesRepository();
 
   async listByClass(params: {
     currentUser: AppUser;
@@ -166,7 +168,18 @@ export class ActivitiesService {
     tenantId: string;
     classId: string;
   }) {
-    if (params.currentUser.role === 'student') return false;
+    if (params.currentUser.role === 'student') {
+      const classItem = await this.classesRepository.findById({
+        tenantId: params.tenantId,
+        id: params.classId,
+      });
+      const course = await this.coursesRepository.findById({
+        tenantId: params.tenantId,
+        id: classItem.courseId,
+      });
+
+      return course.name === params.currentUser.course;
+    }
 
     await this.ensureCanManageClassActivities(params);
     return true;

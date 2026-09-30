@@ -22,6 +22,23 @@ describe('academic data routes', () => {
     );
   });
 
+  it('permite aluno listar atividades da turma do proprio curso', async () => {
+    const response = await request(app)
+      .get(`/api/v1/tenants/${tenantSlug}/classes/class-teacher/activities`)
+      .set('x-tenant-slug', tenantSlug)
+      .set('authorization', 'Bearer valid-student-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'activity-existing',
+          title: 'Atividade Integrada',
+        }),
+      ]),
+    );
+  });
+
   it('permite aluno listar notas usando o id publico do app', async () => {
     const response = await request(app)
       .get(`/api/v1/tenants/${tenantSlug}/students/user-student/grades`)
