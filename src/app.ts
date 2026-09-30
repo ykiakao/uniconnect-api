@@ -15,9 +15,7 @@ const allowedOrigins = new Set(
     .filter(Boolean),
 );
 
-function isAllowedDevOrigin(origin: string) {
-  if (env.NODE_ENV !== 'development') return false;
-
+function isAllowedLocalOrigin(origin: string) {
   try {
     const url = new URL(origin);
     return (
@@ -33,7 +31,7 @@ app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin) || isAllowedDevOrigin(origin)) {
+      if (!origin || allowedOrigins.has(origin) || isAllowedLocalOrigin(origin)) {
         callback(null, true);
         return;
       }
