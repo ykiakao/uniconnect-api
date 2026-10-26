@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: uniconnect-api:latest
+    pull_policy: build
     container_name: uniconnect-api
     restart: unless-stopped
     ports:
