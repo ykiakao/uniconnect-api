@@ -2,6 +2,16 @@ import request from 'supertest';
 
 import { app } from './app';
 
+describe('health check', () => {
+  it('confirma conexao com o banco em /health/ready', async () => {
+    const response = await request(app).get('/api/v1/health/ready');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('ok');
+    expect(response.body.database.status).toBe('ok');
+  });
+});
+
 describe('cors configuration', () => {
   it('permite origem local do painel web', async () => {
     const response = await request(app)
