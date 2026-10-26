@@ -206,6 +206,37 @@ Resposta esperada:
 
 ---
 
+## Deploy com Docker / Portainer
+
+O repositorio inclui `Dockerfile` e `docker-compose.yml` prontos para subir
+como **Stack** no Portainer.
+
+1. No Portainer, va em **Stacks > Add stack**.
+2. Escolha **Repository** (aponte para este repositorio, compose path
+   `docker-compose.yml`) ou cole o conteudo do `docker-compose.yml` no
+   **Web editor**.
+3. Em **Environment variables**, cadastre as variaveis abaixo.
+4. Clique em **Deploy the stack**.
+
+| Variavel | Obrigatoria | Padrao | Descricao |
+| -------- | ----------- | ------ | --------- |
+| `API_EXTERNAL_PORT` | Nao | `3333` | Porta exposta no host (mapeada para a 3333 do container) |
+| `NODE_ENV` | Nao | `production` | Ambiente da API |
+| `API_VERSION` | Nao | `v1` | Prefixo das rotas |
+| `APP_ORIGIN` | Nao | `http://localhost:8080` | Origens liberadas no CORS, separadas por virgula |
+| `SUPABASE_URL` | Sim | - | URL do projeto Supabase |
+| `SUPABASE_ANON_KEY` | Sim | - | Chave anon/public do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Sim | - | Chave service role do Supabase |
+
+Fora do Portainer, o mesmo compose funciona com um `.env` na raiz:
+
+```bash
+docker compose up -d --build
+curl http://localhost:${API_EXTERNAL_PORT:-3333}/api/v1/health
+```
+
+---
+
 ## Rotas Iniciais da API
 
 | Método | Endpoint | Descrição |

@@ -1,0 +1,22 @@
+# Stack para Portainer (Stacks > Add stack).
+# As variaveis abaixo sao lidas do "Environment variables" da stack no Portainer
+# (ou de um arquivo .env ao lado deste compose ao rodar via `docker compose`).
+services:
+  uniconnect-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: uniconnect-api:latest
+    container_name: uniconnect-api
+    restart: unless-stopped
+    ports:
+      - "${API_EXTERNAL_PORT:-3333}:3333"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 3333
+      API_VERSION: ${API_VERSION:-v1}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      SUPABASE_URL: ${SUPABASE_URL:?defina SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?defina SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?defina SUPABASE_SERVICE_ROLE_KEY}

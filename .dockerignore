@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.git
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+*.log
+supabase/.temp
+supabase/.branches
