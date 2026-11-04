@@ -1,3 +1,4 @@
+import { checkAuthError, invalidAuthResponse } from '../shared/supabase-errors';
 import { NextFunction, Request, Response } from 'express';
 
 import { createSupabaseAnonClient } from '../config/supabase';
@@ -52,14 +53,8 @@ export async function requireTenantUser(
     }
 
     const { data, error } = await supabase.auth.getUser(accessToken);
-    if (error || !data.user) {
-      throw new HttpError(
-        401,
-        'INVALID_SESSION',
-        'Sessão inválida ou expirada.',
-        error?.message,
-      );
-    }
+    checkAuthError(error, 'session');
+    if (!data.user) invalidAuthResponse();
 
     request.currentUser = await authRepository.findUserByAuthId({
       authUserId: data.user.id,
@@ -80,14 +75,8 @@ export async function requireAuthenticatedUser(
     const accessToken = getBearerToken(request.header('authorization'));
     const { data, error } = await supabase.auth.getUser(accessToken);
 
-    if (error || !data.user) {
-      throw new HttpError(
-        401,
-        'INVALID_SESSION',
-        'SessÃ£o invÃ¡lida ou expirada.',
-        error?.message,
-      );
-    }
+    checkAuthError(error, 'session');
+    if (!data.user) invalidAuthResponse();
 
     request.currentUser = await authRepository.findAnyUserByAuthId(data.user.id);
     next();

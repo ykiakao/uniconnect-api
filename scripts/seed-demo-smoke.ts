@@ -3,11 +3,12 @@ import { AddressInfo } from 'node:net';
 
 import { app } from '../src/app';
 
+class SmokeError extends Error {}
+
 const tenantSlug = process.env.SEED_DEMO_TENANT_SLUG ?? 'edukmais';
 const demoPassword =
   process.env.SEED_DEMO_PASSWORD ??
-  process.env.DEMO_UNIVERSITY_PASSWORD ??
-  'Demo@2026';
+  process.env.DEMO_UNIVERSITY_PASSWORD;
 
 const demoUsers = {
   student: 'aluno01@edukmais.edu.br',
@@ -59,12 +60,7 @@ async function assertStatus(
 ) {
   if (response.status === expectedStatus) return;
 
-  const body = await readJson(response);
-  assert.equal(
-    response.status,
-    expectedStatus,
-    `${label}: ${JSON.stringify(body)}`,
-  );
+  throw new SmokeError(`${label}: HTTP ${response.status}; esperado ${expectedStatus}.`);
 }
 
 async function login(baseUrl: string, email: string): Promise<LoginBody> {
@@ -80,10 +76,10 @@ async function login(baseUrl: string, email: string): Promise<LoginBody> {
     }),
   });
 
-  await assertStatus(response, 200, `login ${email}`);
+  await assertStatus(response, 200, 'login');
   const body = (await readJson(response)) as LoginBody;
 
-  assert.ok(body.accessToken, `token ausente para ${email}`);
+  assert.ok(body.accessToken, 'token de acesso ausente');
   assert.equal(body.user.email, email);
   assert.equal(body.user.tenantSlug, tenantSlug);
 
@@ -98,6 +94,10 @@ function authHeaders(token: string) {
 }
 
 async function main() {
+  if (!demoPassword?.trim()) {
+    throw new SmokeError('Defina SEED_DEMO_PASSWORD ou DEMO_UNIVERSITY_PASSWORD com senha nao vazia.');
+  }
+
   const server = app.listen(0);
 
   try {
@@ -200,7 +200,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((error: unknown) => {
+  console.error(
+    error instanceof SmokeError
+      ? error.message
+      : 'Falha no seed-demo-smoke.ts; confira configuracao, dados de demonstracao e contratos da API.',
+  );
   process.exitCode = 1;
 });

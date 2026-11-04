@@ -6,6 +6,7 @@ import { HttpError } from '../../shared/http-error';
 import { toApiUserRole } from '../../shared/roles';
 import { AppUser, AuthUserResponse, UserRole } from '../../shared/types';
 import { AuthRepository } from './auth.repository';
+import { checkAuthError, checkSupabaseAvailability, invalidAuthResponse, isAlreadyInvalidSession, isExistingAuthUser } from '../../shared/supabase-errors';
 
 const adminRoles = new Set<UserRole>(['admin', 'coordinator', 'owner']);
 
@@ -39,6 +40,34 @@ export class AuthService {
   private readonly supabaseAdmin = createSupabaseAdminClient();
   private readonly repository = new AuthRepository();
 
+  async confirmedIdentity(accessToken: string) {
+    const { data, error } = await this.supabase.auth.getUser(accessToken);
+    checkAuthError(error, 'session');
+    if (!data.user) invalidAuthResponse();
+    if (!data.user.email || !data.user.email_confirmed_at) {
+      throw new HttpError(403, 'CONFIRMED_EMAIL_REQUIRED', 'Confirme o email antes de aceitar o convite.');
+    }
+    return { id: data.user.id, email: data.user.email.trim().toLowerCase() };
+  }
+
+  async createInvitedAccount(email: string, password: string) {
+    const { data, error } = await this.supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true });
+    checkSupabaseAvailability(error);
+    if (isExistingAuthUser(error)) throw new HttpError(409, 'AUTH_ACCOUNT_EXISTS', 'A conta ja existe. Entre com sua senha e aceite o convite autenticado.');
+    if (error) throw new HttpError(500, 'AUTH_USER_CREATE_FAILED', 'Nao foi possivel criar a conta.');
+    if (!data.user) invalidAuthResponse();
+    return { id: data.user.id, email };
+  }
+
+  async invitedSession(email: string, password: string) {
+    const { data, error } = await this.supabase.auth.signInWithPassword({ email, password });
+    checkAuthError(error, 'credentials');
+    if (!data.user || !data.session) invalidAuthResponse();
+    if (!data.user.email || !data.user.email_confirmed_at) throw new HttpError(403, 'CONFIRMED_EMAIL_REQUIRED', 'Confirme o email antes de aceitar o convite.');
+    return { identity: { id: data.user.id, email: data.user.email.trim().toLowerCase() },
+      session: { accessToken: data.session.access_token, refreshToken: data.session.refresh_token, expiresAt: toIsoExpiresAt(data.session) } };
+  }
+
   async login(params: {
     email: string;
     password: string;
@@ -50,14 +79,8 @@ export class AuthService {
       password: params.password,
     });
 
-    if (error || !data.user || !data.session) {
-      throw new HttpError(
-        401,
-        'INVALID_CREDENTIALS',
-        'E-mail ou senha incorretos',
-        error?.message,
-      );
-    }
+    checkAuthError(error, 'credentials');
+    if (!data.user || !data.session) invalidAuthResponse();
 
     const user = await this.repository.findUserByAuthId({
       authUserId: data.user.id,
@@ -82,12 +105,7 @@ export class AuthService {
     tenantSlug: string;
   }) {
     const session = await this.login(params);
-    const user = await this.repository.findUserByEmail({
-      email: params.email,
-      tenantId: params.tenantId,
-    });
-
-    if (!adminRoles.has(user.role)) {
+    if (!['admin', 'gestor'].includes(session.user.role)) {
       throw new HttpError(
         403,
         'ADMIN_ACCESS_REQUIRED',
@@ -133,7 +151,11 @@ export class AuthService {
   }
 
   async logout(accessToken: string) {
-    await this.supabaseAdmin.auth.admin.signOut(accessToken);
+    const { error } = await this.supabaseAdmin.auth.admin.signOut(accessToken);
+    checkSupabaseAvailability(error);
+    if (error && !isAlreadyInvalidSession(error)) {
+      throw new HttpError(500, 'AUTH_LOGOUT_FAILED', 'Nao foi possivel encerrar a sessao.');
+    }
   }
 
   private async findInternalUserByAccessToken(params: {
@@ -144,14 +166,8 @@ export class AuthService {
       params.accessToken,
     );
 
-    if (error || !data.user) {
-      throw new HttpError(
-        401,
-        'INVALID_SESSION',
-        'Sessão inválida ou expirada.',
-        error?.message,
-      );
-    }
+    checkAuthError(error, 'session');
+    if (!data.user) invalidAuthResponse();
 
     return this.repository.findUserByAuthId({
       authUserId: data.user.id,

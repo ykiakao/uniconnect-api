@@ -13,6 +13,9 @@ const createUserSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(8),
   role: apiRoleSchema,
+  courseId: z.guid().optional(),
+  registration: z.string().trim().max(50).optional(),
+  semester: z.number().int().min(1).max(30).optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -72,6 +75,10 @@ usersRoutes.post('/', async (request, response, next) => {
       email: body.email,
       password: body.password,
       role: body.role,
+      courseId: body.courseId,
+      registration: body.registration,
+      semester: body.semester,
+      requestId: request.requestId,
     });
 
     response.status(201).json(result);
@@ -105,10 +112,24 @@ usersRoutes.patch('/:id/role', async (request, response, next) => {
       tenantId: tenant.id,
       id: request.params.id,
       role: body.role,
+      requestId: request.requestId,
     });
 
     response.json(result);
   } catch (error) {
     next(error);
   }
+});
+
+for (const resource of ['status', 'profile'] as const) usersRoutes.patch(`/:id/${resource}`, async (req, res, next) => {
+  try {
+    const { tenant, currentUser } = requireContext(req);
+    const schema = resource === 'status' ? z.object({ active: z.boolean() }).strict() : z.object({
+      name: z.string().trim().min(1).max(200).optional(), courseId: z.guid().nullable().optional(),
+      registration: z.string().trim().max(50).nullable().optional(), semester: z.number().int().min(1).max(30).nullable().optional(),
+    }).strict();
+    const input = schema.parse(req.body);
+    if (!Object.keys(input).length) throw new HttpError(400, 'VALIDATION_ERROR', 'Informe uma alteracao.');
+    res.json(await usersService.updateProfile({ currentUser, tenantId: tenant.id, tenantSlug: tenant.slug, id: req.params.id, input }));
+  } catch (error) { next(error); }
 });

@@ -1,7 +1,11 @@
+import { checkMutationConflict, checkSupabaseAvailability, checkQueryError } from '../../shared/supabase-errors';
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 import { toApiUserRole } from '../../shared/roles';
 import { UserRole } from '../../shared/types';
+import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import { TenantRepository } from '../tenants/tenant.repository';
 
 type InviteRow = {
   id: string;
@@ -12,6 +16,7 @@ type InviteRow = {
   used_at: string | null;
   created_by: string | null;
   created_at: string;
+  recipient_email: string | null;
 };
 
 type TenantRow = {
@@ -21,7 +26,7 @@ type TenantRow = {
 };
 
 const inviteSelect =
-  'id,tenant_id,code,role,expires_at,used_at,created_by,created_at';
+  'id,tenant_id,code,role,expires_at,used_at,created_by,created_at,recipient_email';
 
 function mapInvite(row: InviteRow) {
   return {
@@ -40,8 +45,9 @@ export class InvitesRepository {
     role: UserRole;
     expiresAt: string;
     createdBy: string;
+    recipientEmail: string;
   }) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('invites')
       .insert({
         tenant_id: params.tenantId,
@@ -49,10 +55,14 @@ export class InvitesRepository {
         role: params.role,
         expires_at: params.expiresAt,
         created_by: params.createdBy,
+        recipient_email: params.recipientEmail,
+        used_at: null,
       })
       .select(inviteSelect)
       .single<InviteRow>();
 
+    checkSupabaseAvailability(error, status);
+    checkMutationConflict(error);
     if (error || !data) {
       throw new HttpError(
         500,
@@ -66,15 +76,22 @@ export class InvitesRepository {
   }
 
   async findActiveByCode(code: string) {
-    const { data, error } = await this.supabase
+    const data = await this.findConsumable(code);
+    const tenant = await this.findTenantById(data.tenant_id);
+    return { tenantSlug: tenant.slug, tenantName: tenant.name, role: toApiUserRole(data.role) };
+  }
+
+  async findConsumable(code: string) {
+    const { data, error, status } = await this.supabase
       .from('invites')
       .select(inviteSelect)
       .eq('code', code)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
-      .single<InviteRow>();
+      .maybeSingle<InviteRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         404,
         'INVITE_NOT_FOUND',
@@ -83,23 +100,36 @@ export class InvitesRepository {
       );
     }
 
-    const tenant = await this.findTenantById(data.tenant_id);
+    await new TenantRepository().requireOperationalById(data.tenant_id);
+    return data;
+  }
 
-    return {
-      tenantSlug: tenant.slug,
-      tenantName: tenant.name,
-      role: toApiUserRole(data.role),
-    };
+  async accept(code: string, identity: { id: string; email: string }, name: string, tenantId: string, requestId: string = randomUUID()) {
+    const { data, error, status } = await this.supabase.rpc('accept_institution_invite', {
+      p_code: code, p_auth_user_id: identity.id, p_email: identity.email, p_name: name, p_request_id: requestId,
+    });
+    if (error?.code === 'P0002') throw new HttpError(404, 'INVITE_NOT_FOUND', 'Convite nao encontrado ou expirado.');
+    if (error?.code === '42501') throw new HttpError(403, 'INVITE_FORBIDDEN', 'Convite nao autorizado.');
+    if (error?.code === '23505') throw new HttpError(409, 'USER_ALREADY_LINKED', 'Ja existe um vinculo com esta instituicao.');
+    if (error?.code === 'PGRST202' || error?.code === '42883') throw new HttpError(503, 'DATABASE_MIGRATION_REQUIRED', 'Atualizacao institucional do banco pendente.');
+    checkQueryError(error, status);
+    const parsed = z.object({ id: z.string().min(1), tenant_id: z.literal(tenantId), auth_user_id: z.literal(identity.id),
+      name: z.string(), email: z.string().email(), role: z.enum(['student','teacher','coordinator','admin','owner']), active: z.literal(true) }).safeParse(data);
+    if (!parsed.success) throw new HttpError(502, 'UPSTREAM_INVALID_RESPONSE', 'Resposta institucional invalida.');
+    const tenant = await this.findTenantById(tenantId);
+    const user = parsed.data;
+    return { id: user.id, name: user.name, email: user.email, role: toApiUserRole(user.role), active: user.active, tenantSlug: tenant.slug };
   }
 
   private async findTenantById(id: string) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('tenants')
       .select('id,name,slug')
       .eq('id', id)
-      .single<TenantRow>();
+      .maybeSingle<TenantRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         404,
         'TENANT_NOT_FOUND',

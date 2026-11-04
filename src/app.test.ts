@@ -25,6 +25,15 @@ describe('cors configuration', () => {
     );
   });
 
+  it('rejeita valor de origem com caminho mesmo no host local', async () => {
+    const response = await request(app)
+      .get('/api/v1/health')
+      .set('origin', 'http://localhost:3000/not-an-origin');
+
+    expect(response.status).toBe(403);
+    expect(response.header['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('permite preflight do Flutter web em porta local dinamica', async () => {
     const response = await request(app)
       .options('/api/v1/auth/login')

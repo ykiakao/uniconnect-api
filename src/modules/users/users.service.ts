@@ -1,8 +1,10 @@
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 import { Pagination, toPaginated } from '../../shared/pagination';
-import { canManageTenant, toUserRole } from '../../shared/roles';
+import { canManageTenant, ensureCanAssignRole, toUserRole } from '../../shared/roles';
 import { ApiUserRole, AppUser } from '../../shared/types';
+import { checkSupabaseAvailability, invalidAuthResponse, isExistingAuthUser } from '../../shared/supabase-errors';
+import { CoursesRepository } from '../courses/courses.repository';
 import {
   toUserResponse,
   UserResponse,
@@ -51,16 +53,27 @@ export class UsersService {
     email: string;
     password: string;
     role: ApiUserRole;
+    courseId?: string;
+    registration?: string;
+    semester?: number;
+    requestId?: string;
   }) {
     this.ensureCanManageUsers(params.currentUser);
+    ensureCanAssignRole(params.currentUser.role, toUserRole(params.role));
+    if (params.courseId) await new CoursesRepository().findById({ tenantId: params.tenantId, id: params.courseId });
 
     const authUser = await this.ensureAuthUser(params.email, params.password);
     const user = await this.repository.create({
       tenantId: params.tenantId,
       authUserId: authUser.id,
+      actorAuthId: params.currentUser.authUserId,
+      requestId: params.requestId,
       name: params.name,
       email: params.email,
       role: toUserRole(params.role),
+      courseId: params.courseId,
+      registration: params.registration,
+      semester: params.semester,
     });
 
     return toUserResponse({
@@ -92,12 +105,21 @@ export class UsersService {
     tenantId: string;
     id: string;
     role: ApiUserRole;
+    requestId?: string;
   }) {
     this.ensureCanManageUsers(params.currentUser);
+    const target = await this.repository.findById({ tenantId: params.tenantId, id: params.id });
+    if (target.authUserId === params.currentUser.authUserId) {
+      throw new HttpError(403, 'ROLE_CHANGE_FORBIDDEN', 'Nao e permitido alterar o proprio papel.');
+    }
+    ensureCanAssignRole(params.currentUser.role, toUserRole(params.role), target.role);
     const user = await this.repository.updateRole({
       tenantId: params.tenantId,
       id: params.id,
       role: toUserRole(params.role),
+      expectedRole: target.role,
+      actorAuthId: params.currentUser.authUserId,
+      requestId: params.requestId,
     });
 
     return {
@@ -111,6 +133,16 @@ export class UsersService {
       throw new HttpError(403, 'FORBIDDEN', 'Acesso não permitido');
     }
   }
+  async updateProfile(params: { currentUser: AppUser; tenantId: string; tenantSlug: string; id: string;
+    input: { name?: string; active?: boolean; courseId?: string | null; registration?: string | null; semester?: number | null } }) {
+    this.ensureCanManageUsers(params.currentUser);
+    const target = await this.repository.findById({ tenantId: params.tenantId, id: params.id });
+    if (target.authUserId === params.currentUser.authUserId) throw new HttpError(403, 'SELF_CHANGE_FORBIDDEN', 'Nao altere o proprio vinculo administrativo.');
+    ensureCanAssignRole(params.currentUser.role, target.role, target.role);
+    if (params.input.courseId) await new CoursesRepository().findById({ tenantId: params.tenantId, id: params.input.courseId });
+    const user = await this.repository.updateProfile(params.tenantId, params.id, target.role, params.input);
+    return toUserResponse({ user, tenantSlug: params.tenantSlug });
+  }
 
   private async ensureAuthUser(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -121,9 +153,12 @@ export class UsersService {
     });
 
     if (!error && data.user) return data.user;
-
-    const existing = await this.findAuthUserByEmail(normalizedEmail);
-    if (existing) return existing;
+    if (!error) invalidAuthResponse();
+    checkSupabaseAvailability(error);
+    if (isExistingAuthUser(error)) {
+      const existing = await this.findAuthUserByEmail(normalizedEmail);
+      if (existing) return existing;
+    }
 
     throw new HttpError(
       500,
@@ -143,6 +178,7 @@ export class UsersService {
         perPage,
       });
 
+      checkSupabaseAvailability(error);
       if (error) {
         throw new HttpError(
           500,
@@ -152,6 +188,7 @@ export class UsersService {
         );
       }
 
+      if (!Array.isArray(data?.users)) invalidAuthResponse();
       const user = data.users.find(
         (candidate) => candidate.email?.toLowerCase() === email,
       );

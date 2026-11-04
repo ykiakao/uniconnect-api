@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "runId": null,
+  "host": "127.0.0.1",
+  "port": 5432,
+  "database": null,
+  "role": "pgc_executor",
+  "postgresImage": null,
+  "workerImage": null,
+  "nodeMajor": 22,
+  "engine": "npipe:////./pipe/dockerDesktopLinuxEngine"
+}

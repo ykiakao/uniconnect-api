@@ -1,6 +1,7 @@
 import { app } from './app';
 import { env } from './config/env';
+import { logger } from './observability/logger';
 
 app.listen(env.PORT, env.HOST, () => {
-  console.log(`UniConnect API running at http://${env.HOST}:${env.PORT}`);
+  logger.startup();
 });

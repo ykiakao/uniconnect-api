@@ -1,3 +1,4 @@
+import { checkMutationConflict, checkSupabaseAvailability, checkQueryError, requireRows, requireCount } from '../../shared/supabase-errors';
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 import { Pagination } from '../../shared/pagination';
@@ -37,6 +38,7 @@ export class ClassesRepository {
     courseId: string;
     teacherAuthUserId?: string;
     pagination: Pagination;
+    classIds?: string[];
   }) {
     let query = this.supabase
       .from('classes')
@@ -46,17 +48,20 @@ export class ClassesRepository {
       )
       .eq('tenant_id', params.tenantId)
       .eq('course_id', params.courseId)
-      .order('name');
+      .order('name')
+      .order('id');
 
+    if (params.classIds) query = query.in('id', params.classIds);
     if (params.teacherAuthUserId) {
       query = query.eq('teacher_id', params.teacherAuthUserId);
     }
 
-    const { data, error, count } = await query.range(
+    const { data, error, count, status } = await query.range(
       params.pagination.offset,
       params.pagination.offset + params.pagination.limit - 1,
     );
 
+    checkSupabaseAvailability(error, status);
     if (error) {
       throw new HttpError(
         500,
@@ -67,8 +72,8 @@ export class ClassesRepository {
     }
 
     return {
-      classes: (data ?? []).map((row) => mapClass(row as ClassRow)),
-      total: count,
+      classes: requireRows(data).map((row) => mapClass(row as ClassRow)),
+      total: requireCount(count),
     };
   }
 
@@ -78,7 +83,7 @@ export class ClassesRepository {
     name: string;
     teacherId?: string;
   }) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('classes')
       .insert({
         tenant_id: params.tenantId,
@@ -89,6 +94,8 @@ export class ClassesRepository {
       .select('id,tenant_id,course_id,name,teacher_id,semester,created_at,updated_at')
       .single<ClassRow>();
 
+    checkSupabaseAvailability(error, status);
+    checkMutationConflict(error);
     if (error || !data) {
       throw new HttpError(
         500,
@@ -116,9 +123,10 @@ export class ClassesRepository {
       query = query.eq('teacher_id', params.teacherAuthUserId);
     }
 
-    const { data, error } = await query.single<ClassRow>();
+    const { data, error, status } = await query.maybeSingle<ClassRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         404,
         'CLASS_NOT_FOUND',
@@ -136,7 +144,7 @@ export class ClassesRepository {
     name: string;
     teacherId?: string;
   }) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('classes')
       .update({
         name: params.name,
@@ -146,9 +154,10 @@ export class ClassesRepository {
       .eq('tenant_id', params.tenantId)
       .eq('id', params.id)
       .select('id,tenant_id,course_id,name,teacher_id,semester,created_at,updated_at')
-      .single<ClassRow>();
+      .maybeSingle<ClassRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         404,
         'CLASS_NOT_FOUND',
@@ -161,12 +170,14 @@ export class ClassesRepository {
   }
 
   async delete(params: { tenantId: string; id: string }) {
-    const { error } = await this.supabase
+    const { error, status } = await this.supabase
       .from('classes')
       .delete()
       .eq('tenant_id', params.tenantId)
       .eq('id', params.id);
 
+    checkSupabaseAvailability(error, status);
+    checkMutationConflict(error);
     if (error) {
       throw new HttpError(
         500,
