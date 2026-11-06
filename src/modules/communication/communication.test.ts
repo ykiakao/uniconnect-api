@@ -56,12 +56,70 @@ beforeAll(async () => {
   await db.from('tenants').insert({id:otherTenantId,slug:'other',name:'Synthetic other',plan:'starter',status:'active'});
   await db.from('app_users').insert({id:foreignTeacher,tenant_id:otherTenantId,auth_user_id:'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',role:'teacher',name:'Synthetic foreign',email:'foreign@example.invalid',active:true});
 });
+beforeEach(() => { jest.spyOn(Date,'now').mockReturnValue(Date.parse('2026-11-05T19:00:00Z')); });
+
 afterEach(async () => {
   jest.restoreAllMocks();
   await db.from('app_users').update({active:true}).eq('tenant_id',tenantId);
   await db.from('enrollments').update({status:'active'}).eq('id','communication-enrollment');
   await db.from('teaching_assignments').update({status:'active'}).eq('id','communication-assignment');
   await db.from('academic_periods').update({status:'active'}).eq('id',periodId);
+});
+
+describe('chat Realtime HTTP contract', () => {
+  it('provides distinct private topics to the authorized student and teacher',async()=>{
+    const chat=await conversation();
+    const student=await call('get',`/conversations/${chat.id}/realtime`,'student');
+    const teacher=await call('get',`/conversations/${chat.id}/realtime`,'teacher');
+    expect(student.status).toBe(200);expect(teacher.status).toBe(200);
+    expect(student.body.topic).toBe(`uc:chat:${tenantId}:${chat.id}:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa`);
+    expect(teacher.body.topic).toBe(`uc:chat:${tenantId}:${chat.id}:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb`);
+    expect(student.body.private).toBe(true);
+    expect(student.body.serviceWindow.canSendNow).toBe(true);
+  });
+  it('rejects a nonparticipant, foreign tenant, missing JWT and caller-supplied channel identity',async()=>{
+    const chat=await conversation();
+    expect((await call('get',`/conversations/${chat.id}/realtime`,'admin')).status).toBe(404);
+    expect((await foreignGet(`/conversations/${chat.id}/realtime`)).status).toBe(404);
+    expect((await request(app).get(`${base}/conversations/${chat.id}/realtime`).set('x-tenant-slug','edukmais')).status).toBe(401);
+    expect((await call('get',`/conversations/${chat.id}/realtime?topic=global`,'student')).status).toBe(400);
+  });
+  it('rejects new sends at closing time but permits history and receipt updates',async()=>{
+    const chat=await conversation();
+    jest.spyOn(Date,'now').mockReturnValue(Date.parse('2026-11-05T23:00:00Z'));
+    const execute=jest.spyOn(CommunicationRepository.prototype,'execute');
+    const rejected=await call('post',`/conversations/${chat.id}/messages`,'student').send({content:'Outside window',clientMessageId:randomUUID()});
+    expect(rejected.status).toBe(403);expect(rejected.body.error.code).toBe('CHAT_OUTSIDE_SERVICE_HOURS');
+    expect(execute).toHaveBeenCalledWith(tenantId,studentId,'message_send',expect.any(Object));
+    expect((await call('get',`/conversations/${chat.id}/messages?afterSequence=0&limit=20`,'student')).status).toBe(200);
+    expect((await call('post',`/conversations/${chat.id}/read`,'student').send({upToSequence:0})).status).toBe(200);
+    const descriptor=await call('get',`/conversations/${chat.id}/realtime`,'student');
+    expect(descriptor.status).toBe(200);expect(descriptor.body.serviceWindow.canSendNow).toBe(false);
+  });
+  it('replays an already persisted attempt after closing without advancing sequence',async()=>{
+    const chat=await conversation(),payload={content:'Response lost before closing',clientMessageId:randomUUID()};
+    const original=await call('post',`/conversations/${chat.id}/messages`,'student').send(payload);
+    expect(original.status).toBe(201);
+    jest.spyOn(Date,'now').mockReturnValue(Date.parse('2026-11-05T23:00:00Z'));
+    const replay=await call('post',`/conversations/${chat.id}/messages`,'student').send(payload);
+    expect(replay.status).toBe(201);expect(replay.body).toEqual(original.body);
+    const current=await call('get',`/conversations/${chat.id}`,'student');
+    expect(current.body.lastSequence).toBe(original.body.sequence);
+  });
+  it('recovers missed messages by cursor and preserves the identity of a repeated HTTP send',async()=>{
+    const chat=await conversation(),clientMessageId=randomUUID();
+    const first=await call('post',`/conversations/${chat.id}/messages`,'student').send({content:'First synthetic',clientMessageId});
+    const duplicate=await call('post',`/conversations/${chat.id}/messages`,'student').send({content:'First synthetic',clientMessageId});
+    expect(first.status).toBe(201);expect(duplicate.body.id).toBe(first.body.id);expect(duplicate.body.sequence).toBe(first.body.sequence);
+    const second=await call('post',`/conversations/${chat.id}/messages`,'teacher').send({content:'Second synthetic',clientMessageId:randomUUID()});
+    expect(second.status).toBe(201);
+    const page=await call('get',`/conversations/${chat.id}/messages?afterSequence=${chat.lastSequence}&limit=1`,'teacher');
+    expect(page.body.data.map((m:{id:string})=>m.id)).toEqual([first.body.id]);
+    expect(page.body.meta.hasMore).toBe(true);
+    const next=await call('get',`/conversations/${chat.id}/messages?afterSequence=${page.body.meta.nextAfterSequence}&limit=1`,'teacher');
+    expect(next.body.data.map((m:{id:string})=>m.id)).toEqual([second.body.id]);
+    expect(next.body.meta.nextAfterSequence).toBe(first.body.sequence+1);
+  });
 });
 
 describe('academic notices', () => {

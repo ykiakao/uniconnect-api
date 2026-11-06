@@ -2,11 +2,20 @@ import { AppUser } from '../../shared/types';
 import { HttpError } from '../../shared/http-error';
 import { CommunicationRepository } from './communication.repository';
 import { CommunicationOperation } from './communication.schemas';
+import { chatServiceOpen, chatServiceWindow, chatTopic } from './chat-realtime';
 import { conversationDto, listResultSchema, messageDto, messageReadResultSchema, messageResultSchema, noticeDto,
   noticeHistorySchema, noticeReadResultSchema, notificationCountSchema, notificationDto, parseCommunication } from './communication.dto';
 
 export class CommunicationService {
-  constructor(private readonly repository = new CommunicationRepository()) {}
+  constructor(private readonly repository = new CommunicationRepository(), private readonly now = () => new Date(Date.now())) {}
+
+  async realtime(user: AppUser, tenantId: string, conversationId: string) {
+    const conversation = await this.execute(user, tenantId, 'conversation_get', { id: conversationId }) as ReturnType<typeof conversationDto>;
+    const now = this.now();
+    return { transport: 'supabase-broadcast', private: true, topic: chatTopic(tenantId, conversation.id, user.authUserId),
+      events: ['message.created', 'conversation.read'], lastSequence: conversation.lastSequence, serverTime: now.toISOString(),
+      serviceWindow: { ...chatServiceWindow, canSendNow: chatServiceOpen(now) } };
+  }
 
   async execute(user: AppUser, tenantId: string, operation: CommunicationOperation, input: Record<string, unknown>) {
     if (user.tenantId !== tenantId || user.active === false) throw new HttpError(403, 'FORBIDDEN', 'Vinculo institucional invalido.');

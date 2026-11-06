@@ -38,6 +38,14 @@ for (const operation of ['publish', 'archive', 'read'] as const) {
 }
 conversationsRoutes.post('/', mutation(), handler('conversation_create', { schema: conversationCreateSchema, status: 201 }));
 conversationsRoutes.get('/', handler('conversation_list', { schema: pageSchema, query: true, paginated: true }));
+conversationsRoutes.get('/:id/realtime', async (request, response, next) => {
+  try {
+    if (!request.currentUser || !request.tenant) throw new HttpError(400, 'TENANT_REQUIRED', 'Instituicao nao informada.');
+    emptySchema.parse(request.query);
+    emptySchema.parse(request.body ?? {});
+    response.json(await service.realtime(request.currentUser, request.tenant.id, communicationId.parse(request.params.id)));
+  } catch (error) { next(error); }
+});
 conversationsRoutes.get('/:id', handler('conversation_get', { query: true, id: true }));
 conversationsRoutes.post('/:id/messages', mutation(), handler('message_send', { schema: messageSendSchema, status: 201, id: true }));
 conversationsRoutes.get('/:id/messages', handler('message_list', { schema: messageListSchema, query: true, id: true }));

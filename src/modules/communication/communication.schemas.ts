@@ -49,7 +49,7 @@ export type CommunicationOperation =
 
 export type CommunicationEvent =
   | { type: 'message.created'; tenantId: string; conversationId: string; messageId: string; sequence: number }
-  | { type: 'conversation.read'; tenantId: string; conversationId: string; userId: string; upToSequence: number }
+  | { type: 'conversation.read'; tenantId: string; conversationId: string; readerId: string; upToSequence: number }
   | { type: 'notification.created'; tenantId: string; userId: string; notificationId: string };
 
 export function communicationPage<T extends { page: number; limit: number }>(value: T) {

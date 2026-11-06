@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { chatServiceOpen } from '../modules/communication/chat-realtime';
 
 type Row = Record<string, unknown>;
 type Store = Record<string, Row[]>;
@@ -37,12 +38,12 @@ export function notifyWorkflowEvent(db: Store, name: string, args: Row, value: u
 }
 
 export function mockCommunicationRpc(name: string, args: Row, db: Store): Result | undefined {
-  if (name !== 'academic_communication') return undefined;
+  if (!['academic_communication','academic_chat_send'].includes(name)) return undefined;
   initialize(db);
   const tenant = args.p_tenant_id;
   const scoped = (table: string) => (db[table] ?? []).filter(row => row.tenant_id === tenant);
   const input = args.p_payload as Row;
-  const operation = String(args.p_operation);
+  const operation = name === 'academic_chat_send' ? 'message_send' : String(args.p_operation);
   const result = (value: unknown): Result => ({ data: structuredClone(value), error: null, status: 200 });
   try {
     const actor = scoped('app_users').find(user => user.id === args.p_actor_id && active(user)) ?? reject('42501');
@@ -146,6 +147,7 @@ export function mockCommunicationRpc(name: string, args: Row, db: Store): Result
       const row = conversation(); validatePair(row.class_id, row.student_id, row.teacher_id);
       const duplicate = scoped('messages').find(message => message.conversation_id === row.id && message.sender_id === actor.id && message.client_message_id === input.clientMessageId);
       if (duplicate) { if (duplicate.content !== input.content) reject(); return result(duplicate); }
+      if (name === 'academic_chat_send' && !chatServiceOpen(new Date(Date.now()))) reject('PCH01');
       const message = { id: randomUUID(), tenant_id: tenant, class_id: row.class_id, conversation_id: row.id, sender_id: actor.id, content: input.content,
         client_message_id: input.clientMessageId, sequence: Number(row.last_sequence) + 1, created_at: now() };
       row.last_sequence = message.sequence; row.updated_at = message.created_at; db.messages.push(message);
