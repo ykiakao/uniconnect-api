@@ -1,9 +1,10 @@
+import { checkSupabaseAvailability, requireRows, requireCount } from '../../shared/supabase-errors';
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 
 type CountFilter = {
   column: string;
-  value: string;
+  value: string | boolean;
 };
 
 type ActivityRow = {
@@ -30,6 +31,7 @@ export class ReportsRepository {
         this.count('app_users', [
           { column: 'tenant_id', value: tenantId },
           { column: 'role', value: 'student' },
+          { column: 'active', value: true },
         ]),
       ]);
 
@@ -47,11 +49,12 @@ export class ReportsRepository {
     to?: string;
     courseId?: string;
   }) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('activities')
       .select('id,class_id,created_at,due_date')
       .eq('tenant_id', params.tenantId);
 
+    checkSupabaseAvailability(error, status);
     if (error) {
       throw new HttpError(
         500,
@@ -72,7 +75,7 @@ export class ReportsRepository {
     const toTime = params.to ? new Date(params.to).getTime() : undefined;
     const grouped = new Map<string, number>();
 
-    (data ?? [])
+    requireRows(data)
       .map((row) => row as ActivityRow)
       .filter((activity) => {
         if (allowedClassIds && !allowedClassIds.has(activity.class_id)) {
@@ -121,8 +124,9 @@ export class ReportsRepository {
       query = query.eq(filter.column, filter.value);
     }
 
-    const { count, error } = await query;
+    const { count, error, status } = await query;
 
+    checkSupabaseAvailability(error, status);
     if (error) {
       throw new HttpError(
         500,
@@ -132,19 +136,20 @@ export class ReportsRepository {
       );
     }
 
-    return count ?? 0;
+    return requireCount(count);
   }
 
   private async listClassIdsByCourse(params: {
     tenantId: string;
     courseId: string;
   }) {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('classes')
       .select('id,course_id')
       .eq('tenant_id', params.tenantId)
       .eq('course_id', params.courseId);
 
+    checkSupabaseAvailability(error, status);
     if (error) {
       throw new HttpError(
         500,
@@ -154,6 +159,6 @@ export class ReportsRepository {
       );
     }
 
-    return new Set((data ?? []).map((row) => (row as ClassRow).id));
+    return new Set(requireRows(data).map((row) => (row as ClassRow).id));
   }
 }

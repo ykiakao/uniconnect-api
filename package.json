@@ -12,11 +12,15 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "setup:supabase": "tsx scripts/setup-supabase.ts",
+    "migrations:homologation:offline": "node scripts/homologation-migrations.cjs --offline",
+    "test:homologation-invoker": "node --test scripts/tests/homologation-migrations.test.cjs",
     "seed:demo": "tsx scripts/seed-demo-university.ts",
     "test:auth": "tsx scripts/auth-smoke.ts",
     "test:academic": "tsx scripts/academic-smoke.ts",
     "test:invites": "tsx scripts/invite-smoke.ts",
     "test:seed-demo": "tsx scripts/seed-demo-smoke.ts",
+    "test:academic-build": "node scripts/academic-production-smoke.cjs",
+    "test:security-db": "node scripts/security-database-test.cjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"
@@ -29,7 +33,7 @@
     "helmet": "^8.0.0",
     "pg": "^8.21.0",
     "ws": "^8.21.0",
-    "zod": "^3.24.1"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

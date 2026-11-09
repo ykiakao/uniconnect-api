@@ -1,26 +1,11 @@
 import { Request, Router } from 'express';
-import { z } from 'zod';
 
 import { requireTenantUser } from '../../middleware/auth-context';
 import { HttpError } from '../../shared/http-error';
 import { parsePagination } from '../../shared/pagination';
 import { ActivitiesService } from './activities.service';
-
-const activityCreateSchema = z.object({
-  title: z.string().trim().min(1),
-  description: z.string().trim().optional(),
-  dueDate: z.string().datetime().optional(),
-  type: z.string().trim().min(1).default('assignment'),
-});
-
-const activityUpdateSchema = z
-  .object({
-    title: z.string().trim().min(1).optional(),
-    description: z.string().trim().optional(),
-    dueDate: z.string().datetime().optional(),
-    type: z.string().trim().min(1).optional(),
-  })
-  .refine((value) => Object.keys(value).length > 0);
+import { activityCreateSchema,activityUpdateSchema,legacyIdSchema,submissionIdSchema,versionSchema,workflowPaginationSchema } from './activities.workflow.schemas';
+import { createRateLimit } from '../../middleware/rate-limit';
 
 const activitiesService = new ActivitiesService();
 
@@ -42,7 +27,7 @@ function requireContext(request: Request) {
 }
 
 function getParam(request: Request, key: string) {
-  return (request.params as Record<string, string>)[key];
+  return legacyIdSchema.parse((request.params as Record<string, string>)[key]);
 }
 
 classActivitiesRoutes.get('/', async (request, response, next) => {
@@ -52,7 +37,7 @@ classActivitiesRoutes.get('/', async (request, response, next) => {
       currentUser,
       tenantId: tenant.id,
       classId: getParam(request, 'classId'),
-      pagination: parsePagination(request.query),
+      pagination: parsePagination(workflowPaginationSchema.parse(request.query)),
     });
 
     response.json(result);
@@ -69,10 +54,7 @@ classActivitiesRoutes.post('/', async (request, response, next) => {
       currentUser,
       tenantId: tenant.id,
       classId: getParam(request, 'classId'),
-      title: body.title,
-      description: body.description,
-      dueDate: body.dueDate,
-      type: body.type,
+      ...body,
     });
 
     response.status(201).json(result);
@@ -87,7 +69,7 @@ activitiesRoutes.get('/:id', async (request, response, next) => {
     const result = await activitiesService.findById({
       currentUser,
       tenantId: tenant.id,
-      id: request.params.id,
+      id: getParam(request,'id'),
     });
 
     response.json(result);
@@ -103,11 +85,8 @@ activitiesRoutes.put('/:id', async (request, response, next) => {
     const result = await activitiesService.update({
       currentUser,
       tenantId: tenant.id,
-      id: request.params.id,
-      title: body.title,
-      description: body.description,
-      dueDate: body.dueDate,
-      type: body.type,
+      id: getParam(request,'id'),
+      ...body,
     });
 
     response.json(result);
@@ -122,11 +101,19 @@ activitiesRoutes.delete('/:id', async (request, response, next) => {
     await activitiesService.delete({
       currentUser,
       tenantId: tenant.id,
-      id: request.params.id,
+      id: getParam(request,'id'),
     });
 
     response.status(204).send();
   } catch (error) {
     next(error);
   }
+});
+
+for (const operation of ['publish','close'] as const) activitiesRoutes.post(`/:id/${operation}`,createRateLimit({max:120,windowMs:60000}),async(req,res,next)=>{
+  try {
+    const {tenant,currentUser}=requireContext(req);
+    const body=versionSchema.parse(req.body);
+    res.json(await activitiesService.transition({currentUser,tenantId:tenant.id,id:submissionIdSchema.parse(req.params.id),expectedVersion:body.expectedVersion},operation));
+  } catch(error){next(error);}
 });

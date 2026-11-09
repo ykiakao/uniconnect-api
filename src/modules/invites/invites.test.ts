@@ -10,10 +10,10 @@ describe('institution invites', () => {
       .post(`/api/v1/tenants/${tenantSlug}/invites`)
       .set('x-tenant-slug', tenantSlug)
       .set('authorization', 'Bearer valid-coordinator-token')
-      .send({ role: 'aluno', expiresIn: 3 });
+      .send({ role: 'aluno', expiresIn: 3, recipientEmail: 'synthetic@example.invalid' });
 
     expect(response.status).toBe(201);
-    expect(response.body.code).toMatch(/^EDU-[A-Z0-9]{8}$/);
+    expect(response.body.code).toMatch(/^EDU-[A-Z0-9]{48}$/);
     expect(new Date(response.body.expiresAt).getTime()).toBeGreaterThan(
       Date.now(),
     );
@@ -24,7 +24,7 @@ describe('institution invites', () => {
       .post(`/api/v1/tenants/${tenantSlug}/invites`)
       .set('x-tenant-slug', tenantSlug)
       .set('authorization', 'Bearer valid-teacher-token')
-      .send({ role: 'aluno' });
+      .send({ role: 'aluno', recipientEmail: 'synthetic@example.invalid' });
 
     expect(response.status).toBe(403);
   });

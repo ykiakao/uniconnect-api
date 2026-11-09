@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "environment": "homologation",
+  "projectRef": "pvacwfypqsstdrfxajkg",
+  "connection": {
+    "channel": "direct",
+    "host": "db.pvacwfypqsstdrfxajkg.supabase.co",
+    "port": 5432,
+    "database": "postgres",
+    "tlsMode": "verify-full",
+    "login": null,
+    "expectedSessionUser": null,
+    "expectedCurrentUser": null
+  },
+  "evidenceReferences": {
+    "Q06": null,
+    "Q07": null,
+    "Q08": null,
+    "Q12": null
+  }
+}

@@ -3,19 +3,19 @@ import { AddressInfo } from 'node:net';
 
 import { app } from '../src/app';
 
+class SmokeError extends Error {}
+
 const tenantSlug = process.env.ACADEMIC_SMOKE_TENANT_SLUG ?? 'edukmais';
 const coordinatorEmail =
   process.env.ACADEMIC_SMOKE_COORDINATOR_EMAIL ?? 'coordenador@edukmais.edu.br';
 const coordinatorPassword =
   process.env.ACADEMIC_SMOKE_COORDINATOR_PASSWORD ??
-  process.env.DEMO_COORDINATOR_PASSWORD ??
-  '123456';
+  process.env.DEMO_COORDINATOR_PASSWORD;
 const studentEmail =
   process.env.ACADEMIC_SMOKE_STUDENT_EMAIL ?? 'aluno@edukmais.edu.br';
 const studentPassword =
   process.env.ACADEMIC_SMOKE_STUDENT_PASSWORD ??
-  process.env.DEMO_STUDENT_PASSWORD ??
-  '123456';
+  process.env.DEMO_STUDENT_PASSWORD;
 
 async function readJson(response: Response) {
   const text = await response.text();
@@ -29,12 +29,7 @@ async function assertStatus(
 ) {
   if (response.status === expectedStatus) return;
 
-  const body = await readJson(response);
-  assert.equal(
-    response.status,
-    expectedStatus,
-    `${label}: ${JSON.stringify(body)}`,
-  );
+  throw new SmokeError(`${label}: HTTP ${response.status}; esperado ${expectedStatus}.`);
 }
 
 async function login(baseUrl: string, email: string, password: string) {
@@ -46,7 +41,7 @@ async function login(baseUrl: string, email: string, password: string) {
     },
     body: JSON.stringify({ email, password }),
   });
-  await assertStatus(response, 200, `login ${email}`);
+  await assertStatus(response, 200, 'login');
 
   const body = await readJson(response);
   assert.ok(body.accessToken);
@@ -54,6 +49,13 @@ async function login(baseUrl: string, email: string, password: string) {
 }
 
 async function main() {
+  if (!coordinatorPassword?.trim()) {
+    throw new SmokeError('Defina ACADEMIC_SMOKE_COORDINATOR_PASSWORD ou DEMO_COORDINATOR_PASSWORD com senha nao vazia.');
+  }
+  if (!studentPassword?.trim()) {
+    throw new SmokeError('Defina ACADEMIC_SMOKE_STUDENT_PASSWORD ou DEMO_STUDENT_PASSWORD com senha nao vazia.');
+  }
+
   const server = app.listen(0);
 
   try {
@@ -141,7 +143,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((error: unknown) => {
+  console.error(
+    error instanceof SmokeError
+      ? error.message
+      : 'Falha no academic-smoke.ts; confira configuracao, dados de demonstracao e contratos da API.',
+  );
   process.exitCode = 1;
 });

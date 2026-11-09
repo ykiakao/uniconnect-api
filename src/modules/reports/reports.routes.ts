@@ -1,17 +1,16 @@
 import { Request, Router } from 'express';
 import { z } from 'zod';
 
-import {
-  requireAuthenticatedUser,
-  requireTenantUser,
-} from '../../middleware/auth-context';
+import { requireTenantUser } from '../../middleware/auth-context';
+import { requirePlatformUser } from '../../middleware/platform-context';
 import { HttpError } from '../../shared/http-error';
 import { ReportsService } from './reports.service';
+import { apiDateTime } from '../../shared/validation';
 
 const engagementQuerySchema = z.object({
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
-  courseId: z.string().uuid().optional(),
+  from: apiDateTime().optional(),
+  to: apiDateTime().optional(),
+  courseId: z.guid().optional(),
 });
 
 const reportsService = new ReportsService();
@@ -20,7 +19,7 @@ export const tenantReportsRoutes = Router({ mergeParams: true });
 export const globalReportsRoutes = Router();
 
 tenantReportsRoutes.use(requireTenantUser);
-globalReportsRoutes.use(requireAuthenticatedUser);
+globalReportsRoutes.use(requirePlatformUser);
 
 function requireTenantContext(request: Request) {
   if (!request.tenant || !request.currentUser) {
@@ -33,8 +32,8 @@ function requireTenantContext(request: Request) {
   };
 }
 
-function requireCurrentUser(request: Request) {
-  if (!request.currentUser) {
+function requirePlatformPrincipal(request: Request) {
+  if (!request.platformPrincipal) {
     throw new HttpError(
       401,
       'AUTH_TOKEN_REQUIRED',
@@ -42,7 +41,7 @@ function requireCurrentUser(request: Request) {
     );
   }
 
-  return request.currentUser;
+  return request.platformPrincipal;
 }
 
 tenantReportsRoutes.get('/summary', async (request, response, next) => {
@@ -79,7 +78,7 @@ tenantReportsRoutes.get('/engagement', async (request, response, next) => {
 
 globalReportsRoutes.get('/reports/global', async (request, response, next) => {
   try {
-    const result = await reportsService.global(requireCurrentUser(request));
+    const result = await reportsService.global(requirePlatformPrincipal(request));
     response.json(result);
   } catch (error) {
     next(error);

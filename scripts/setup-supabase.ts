@@ -5,11 +5,20 @@ import { join } from 'node:path';
 
 import { createClient, User } from '@supabase/supabase-js';
 import { Client } from 'pg';
+import { applyGuardedMigration } from './lib/migration-executor.cjs';
+import { buildAdminDatabaseConfig, ensureUninitializedAdminDatabase } from '../src/config/admin-database';
 
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
+const requiredEnv = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'DEMO_STUDENT_PASSWORD',
+  'DEMO_TEACHER_PASSWORD',
+  'DEMO_COORDINATOR_PASSWORD',
+  'DEMO_OWNER_PASSWORD',
+] as const;
 
 for (const key of requiredEnv) {
-  if (!process.env[key]) {
+  if (!process.env[key]?.trim()) {
     throw new Error(`${key} não configurada no .env.`);
   }
 }
@@ -30,10 +39,10 @@ function createDbClient() {
     throw new Error('SUPABASE_DB_URL não configurada no .env.');
   }
 
-  return new Client({
-    connectionString: process.env.SUPABASE_DB_URL,
-    ssl: { rejectUnauthorized: false },
-  });
+  return new Client(buildAdminDatabaseConfig(process.env.SUPABASE_DB_URL, {
+    mode: process.env.SUPABASE_DB_SSL_MODE,
+    ca: process.env.SUPABASE_DB_CA_FILE ? readFileSync(process.env.SUPABASE_DB_CA_FILE, 'utf8') : undefined,
+  }));
 }
 
 async function findAuthUserByEmail(email: string): Promise<User | null> {
@@ -160,19 +169,19 @@ async function main() {
   const demoUsers = [
     {
       email: 'aluno@edukmais.edu.br',
-      password: process.env.DEMO_STUDENT_PASSWORD ?? '123456',
+      password: process.env.DEMO_STUDENT_PASSWORD!,
     },
     {
       email: 'professor@edukmais.edu.br',
-      password: process.env.DEMO_TEACHER_PASSWORD ?? '123456',
+      password: process.env.DEMO_TEACHER_PASSWORD!,
     },
     {
       email: 'coordenador@edukmais.edu.br',
-      password: process.env.DEMO_COORDINATOR_PASSWORD ?? '123456',
+      password: process.env.DEMO_COORDINATOR_PASSWORD!,
     },
     {
       email: 'dono@edukmais.edu.br',
-      password: process.env.DEMO_OWNER_PASSWORD ?? '123456',
+      password: process.env.DEMO_OWNER_PASSWORD!,
     },
   ];
 
@@ -194,9 +203,11 @@ async function main() {
   await db.connect();
 
   try {
+    await ensureUninitializedAdminDatabase(db);
     async function runSqlFile(fileName: string) {
       const sql = readFileSync(join(process.cwd(), 'supabase', fileName), 'utf8');
-      await db.query(sql);
+      if (fileName === 'seed.sql') await db.query(sql);
+      else await applyGuardedMigration(db, { name: fileName, sql });
       console.log(`SQL executado: ${fileName}`);
     }
 
@@ -210,7 +221,7 @@ async function main() {
 
       for (const migration of migrations) {
         const sql = readFileSync(join(migrationsPath, migration), 'utf8');
-        await db.query(sql);
+        await applyGuardedMigration(db, { name: migration, sql });
         console.log(`Migration executada: ${migration}`);
       }
     }

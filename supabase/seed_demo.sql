@@ -1,219 +1,307 @@
-insert into public.tenants (name, slug, plan, status, active_users)
-values ('EduKMais', 'edukmais', 'growth', 'active', 128)
-on conflict (slug) do update set
-  name = excluded.name,
-  plan = excluded.plan,
-  status = excluded.status,
-  active_users = excluded.active_users,
-  updated_at = now();
-
+-- Dedicated, authorized demo only; this single DO statement is atomic.
+-- Repeated runs preserve existing academic history instead of resetting it.
+-- A duplicate natural key or an incompatible existing record aborts the batch.
 do $$
 declare
+  fixtures constant jsonb := $fixtures$
+{
+  "users": [
+    {"email":"admin@uniconnect.app","name":"Admin Demo","role":"admin"},
+    {"email":"gestor@edukmais.edu.br","name":"Gestor Demo","role":"admin"},
+    {"email":"coordenador@edukmais.edu.br","name":"Coordenador Demo","role":"coordinator","course":"es"},
+    {"email":"professor@edukmais.edu.br","name":"Professor Demo","role":"teacher","course":"es"},
+    {"email":"professor.comp@edukmais.edu.br","name":"Professor Demo Computacao","role":"teacher","course":"cc"},
+    {"email":"professor.eng@edukmais.edu.br","name":"Professor Demo Engenharia","role":"teacher","course":"es"},
+    {"email":"professor.si@edukmais.edu.br","name":"Professor Demo Sistemas","role":"teacher","course":"si"},
+    {"email":"aluno@edukmais.edu.br","name":"Aluno Demo","role":"student","course":"es","registration":"DEMO-000","semester":4},
+    {"email":"aluno01@edukmais.edu.br","name":"Aluno Demo 01","role":"student","course":"es","registration":"DEMO-001","semester":4},
+    {"email":"aluno02@edukmais.edu.br","name":"Aluno Demo 02","role":"student","course":"es","registration":"DEMO-002","semester":4},
+    {"email":"aluno03@edukmais.edu.br","name":"Aluno Demo 03","role":"student","course":"cc","registration":"DEMO-003","semester":3},
+    {"email":"aluno04@edukmais.edu.br","name":"Aluno Demo 04","role":"student","course":"cc","registration":"DEMO-004","semester":3},
+    {"email":"aluno05@edukmais.edu.br","name":"Aluno Demo 05","role":"student","course":"si","registration":"DEMO-005","semester":5}
+  ],
+  "courses": [
+    {"key":"es","name":"Engenharia de Software","description":"Curso ficticio de produto, arquitetura e qualidade de software."},
+    {"key":"cc","name":"Ciencia da Computacao","description":"Curso ficticio de algoritmos, dados e sistemas computacionais."},
+    {"key":"si","name":"Sistemas de Informacao","description":"Curso ficticio de processos, gestao e sistemas corporativos."}
+  ],
+  "periods": [
+    {"code":"DEMO-2026.1","name":"Periodo demonstrativo 2026.1","start_date":"2026-01-01","end_date":"2026-12-31","status":"active"}
+  ],
+  "subjects": [
+    {"code":"DEMO-ES2","course":"es","name":"Engenharia de Software II","status":"active"},
+    {"code":"DEMO-BD","course":"es","name":"Banco de Dados","status":"active"},
+    {"code":"DEMO-AED","course":"cc","name":"Algoritmos e Estruturas de Dados","status":"active"},
+    {"code":"DEMO-GPS","course":"si","name":"Gestao de Projetos de Software","status":"active"}
+  ],
+  "classes": [
+    {"key":"es2","course":"es","subject":"DEMO-ES2","period":"DEMO-2026.1","name":"Engenharia de Software II - 2026.1 Turma A","teacher":"professor.eng@edukmais.edu.br","semester":4,"additional_teachers":["professor@edukmais.edu.br"]},
+    {"key":"bd","course":"es","subject":"DEMO-BD","period":"DEMO-2026.1","name":"Banco de Dados - 2026.1 Turma A","teacher":"professor.eng@edukmais.edu.br","semester":4,"additional_teachers":["professor@edukmais.edu.br"]},
+    {"key":"aed","course":"cc","subject":"DEMO-AED","period":"DEMO-2026.1","name":"Algoritmos e Estruturas de Dados - 2026.1 Turma B","teacher":"professor.comp@edukmais.edu.br","semester":3,"additional_teachers":[]},
+    {"key":"gps","course":"si","subject":"DEMO-GPS","period":"DEMO-2026.1","name":"Gestao de Projetos de Software - 2026.1 Turma A","teacher":"professor.si@edukmais.edu.br","semester":5,"additional_teachers":[]}
+  ],
+  "enrollments": [
+    {"class":"es2","student":"aluno@edukmais.edu.br"},
+    {"class":"bd","student":"aluno@edukmais.edu.br"},
+    {"class":"es2","student":"aluno01@edukmais.edu.br"},
+    {"class":"bd","student":"aluno01@edukmais.edu.br"},
+    {"class":"es2","student":"aluno02@edukmais.edu.br"},
+    {"class":"bd","student":"aluno02@edukmais.edu.br"},
+    {"class":"aed","student":"aluno03@edukmais.edu.br"},
+    {"class":"aed","student":"aluno04@edukmais.edu.br"},
+    {"class":"gps","student":"aluno05@edukmais.edu.br"}
+  ],
+  "activities": [
+    {"key":"requisitos","class":"es2","title":"Documento de requisitos","description":"Mapear requisitos funcionais e nao funcionais do estudo de caso ficticio.","type":"assignment","due_days":7,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."},
+    {"key":"prototipo","class":"es2","title":"Prototipo navegavel","description":"Entregar fluxo principal validado com usuarios ficticios.","type":"project","due_days":14,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."},
+    {"key":"modelagem","class":"bd","title":"Modelagem entidade-relacionamento","description":"Criar o modelo ER do sistema ficticio.","type":"assignment","due_days":10,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."},
+    {"key":"normalizacao","class":"bd","title":"Normalizacao de tabelas","description":"Aplicar as tres primeiras formas normais no modelo ficticio.","type":"assignment","due_days":17,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."},
+    {"key":"arvores","class":"aed","title":"Lista de arvores binaria","description":"Resolver exercicios de insercao, busca e percurso.","type":"assignment","due_days":9,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."},
+    {"key":"sprint","class":"gps","title":"Plano de sprint","description":"Planejar backlog, responsaveis e criterios de aceite ficticios.","type":"assignment","due_days":12,"instructions":"Apresente uma resposta textual sobre o estudo de caso ficticio.","evaluation_criteria":"Coerencia, clareza e justificativa da solucao."}
+  ],
+  "deliveries": [
+    {"activity":"requisitos","student":"aluno@edukmais.edu.br","grade":8.8,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"requisitos","student":"aluno01@edukmais.edu.br","grade":8.8,"review":"draft","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"requisitos","student":"aluno02@edukmais.edu.br","grade":9.2,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"modelagem","student":"aluno@edukmais.edu.br","grade":8.5,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"modelagem","student":"aluno01@edukmais.edu.br","grade":8.5,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"modelagem","student":"aluno02@edukmais.edu.br","grade":7.9,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"arvores","student":"aluno03@edukmais.edu.br","grade":9,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"arvores","student":"aluno04@edukmais.edu.br","grade":8.1,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"sprint","student":"aluno05@edukmais.edu.br","grade":8.7,"review":"published","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico.","feedback":"Avaliacao ficticia: boa coerencia; revise as justificativas."},
+    {"activity":"prototipo","student":"aluno@edukmais.edu.br","review":"pending","answer":"Resposta ficticia para demonstrar a entrega e o workflow academico."}
+  ],
+  "messages": [
+    {"class":"es2","sender":"professor.eng@edukmais.edu.br","content":"Mensagem ficticia: sigam as instrucoes da atividade."},
+    {"class":"es2","sender":"aluno01@edukmais.edu.br","content":"Duvida ficticia: podemos incluir requisitos de acessibilidade?"},
+    {"class":"bd","sender":"professor.eng@edukmais.edu.br","content":"Mensagem ficticia: revisem as cardinalidades do modelo."},
+    {"class":"aed","sender":"professor.comp@edukmais.edu.br","content":"Mensagem ficticia: revisem os percursos em arvores."}
+  ]
+}
+$fixtures$::jsonb;
+  item jsonb;
+  extra_teacher jsonb;
   demo_tenant_id uuid;
+  demo_auth_id uuid;
+  demo_course_id uuid;
+  demo_class_id uuid;
+  demo_teacher_id uuid;
+  demo_student_id uuid;
+  course_name text;
+  course_ids jsonb := '{}'::jsonb;
+  auth_ids jsonb := '{}'::jsonb;
+  member_ids jsonb := '{}'::jsonb;
+  period_ids jsonb := '{}'::jsonb;
+  subject_ids jsonb := '{}'::jsonb;
+  class_ids jsonb := '{}'::jsonb;
+  activity_ids jsonb := '{}'::jsonb;
+  workflow_result jsonb;
+  delivery_created boolean;
+  course_row public.courses%rowtype;
+  member_row public.app_users%rowtype;
+  period_row public.academic_periods%rowtype;
+  subject_row public.subjects%rowtype;
+  class_row public.classes%rowtype;
+  assignment_row public.teaching_assignments%rowtype;
+  enrollment_row public.enrollments%rowtype;
+  activity_row public.activities%rowtype;
+  delivery_row public.activity_submissions%rowtype;
+  grade_row public.grades%rowtype;
 begin
-  select id
-    into demo_tenant_id
-    from public.tenants
-    where slug = 'edukmais';
+  -- Serializes seed batches, not normal API operations. Guards still apply.
+  perform pg_advisory_xact_lock(hashtextextended('uniconnect:seed_demo:edukmais', 0));
 
-  delete from public.messages
-    where tenant_id = demo_tenant_id;
+  insert into public.tenants (name, slug, plan, status, active_users)
+    values ('EduKMais', 'edukmais', 'growth', 'active', 13)
+    on conflict (slug) do nothing;
+  select id into strict demo_tenant_id from public.tenants where slug = 'edukmais';
+  perform public.assert_operational_tenant(demo_tenant_id);
 
-  delete from public.grades
-    where tenant_id = demo_tenant_id;
+  for item in select value from jsonb_array_elements(fixtures->'courses') loop
+    begin
+      select * into strict course_row from public.courses
+        where tenant_id = demo_tenant_id and name = item->>'name';
+    exception when no_data_found then
+      insert into public.courses (tenant_id, name, description)
+        values (demo_tenant_id, item->>'name', item->>'description')
+        returning * into course_row;
+    end;
+    course_ids := course_ids || jsonb_build_object(item->>'key', course_row.id);
+  end loop;
 
-  delete from public.activities
-    where tenant_id = demo_tenant_id;
+  for item in select value from jsonb_array_elements(fixtures->'users') loop
+    -- Missing, unconfirmed or ambiguous Auth identities must not be silently skipped.
+    select id into strict demo_auth_id from auth.users
+      where lower(email) = item->>'email' and email_confirmed_at is not null;
+    demo_course_id := (course_ids->>(item->>'course'))::uuid;
+    select name into course_name from public.courses
+      where tenant_id = demo_tenant_id and id = demo_course_id;
+    begin
+      select * into strict member_row from public.app_users
+        where tenant_id = demo_tenant_id and email = item->>'email';
+    exception when no_data_found then
+      insert into public.app_users (tenant_id, auth_user_id, name, email, role, course, course_id, registration, semester, active)
+        values (demo_tenant_id, demo_auth_id, item->>'name', item->>'email', item->>'role',
+          course_name, demo_course_id, item->>'registration', (item->>'semester')::integer, true)
+        returning * into member_row;
+    end;
+    if member_row.auth_user_id <> demo_auth_id or member_row.role <> item->>'role' or not member_row.active
+      or (member_row.course_id is not null and member_row.course_id is distinct from demo_course_id) then
+      raise exception 'Demo membership conflicts with existing identity, role, course or active status; review manually.';
+    end if;
+    member_ids := member_ids || jsonb_build_object(item->>'email', member_row.id);
+    auth_ids := auth_ids || jsonb_build_object(item->>'email', demo_auth_id);
+  end loop;
 
-  delete from public.classes
-    where tenant_id = demo_tenant_id;
+  for item in select value from jsonb_array_elements(fixtures->'periods') loop
+    begin
+      select * into strict period_row from public.academic_periods
+        where tenant_id = demo_tenant_id and code = item->>'code';
+    exception when no_data_found then
+      insert into public.academic_periods (tenant_id, code, name, start_date, end_date, status)
+        values (demo_tenant_id, item->>'code', item->>'name', (item->>'start_date')::date,
+          (item->>'end_date')::date, item->>'status')
+        returning * into period_row;
+    end;
+    if period_row.status <> 'active' then
+      raise exception 'Demo period is not active; do not reopen academic history automatically.';
+    end if;
+    period_ids := period_ids || jsonb_build_object(item->>'code', period_row.id);
+  end loop;
 
-  delete from public.courses
-    where tenant_id = demo_tenant_id;
+  for item in select value from jsonb_array_elements(fixtures->'subjects') loop
+    demo_course_id := (course_ids->>(item->>'course'))::uuid;
+    begin
+      select * into strict subject_row from public.subjects
+        where tenant_id = demo_tenant_id and code = item->>'code';
+    exception when no_data_found then
+      insert into public.subjects (tenant_id, course_id, code, name, status)
+        values (demo_tenant_id, demo_course_id, item->>'code', item->>'name', item->>'status')
+        returning * into subject_row;
+    end;
+    if subject_row.course_id <> demo_course_id or subject_row.status <> 'active' then
+      raise exception 'Demo subject has an incompatible course or status; review manually.';
+    end if;
+    subject_ids := subject_ids || jsonb_build_object(item->>'code', subject_row.id);
+  end loop;
 
-  delete from public.app_users
-    where tenant_id = demo_tenant_id
-      and email in (
-        'admin@uniconnect.app',
-        'gestor@edukmais.edu.br',
-        'coordenador@edukmais.edu.br',
-        'professor@edukmais.edu.br',
-        'professor.comp@edukmais.edu.br',
-        'professor.eng@edukmais.edu.br',
-        'professor.si@edukmais.edu.br',
-        'aluno@edukmais.edu.br',
-        'aluno01@edukmais.edu.br',
-        'aluno02@edukmais.edu.br',
-        'aluno03@edukmais.edu.br',
-        'aluno04@edukmais.edu.br',
-        'aluno05@edukmais.edu.br'
+  for item in select value from jsonb_array_elements(fixtures->'classes') loop
+    demo_course_id := (course_ids->>(item->>'course'))::uuid;
+    demo_auth_id := (auth_ids->>(item->>'teacher'))::uuid;
+    begin
+      select * into strict class_row from public.classes
+        where tenant_id = demo_tenant_id and name = item->>'name';
+    exception when no_data_found then
+      -- classes_mirror_primary_teacher creates the primary assignment with the member ID.
+      insert into public.classes (tenant_id, course_id, subject_id, academic_period_id, teacher_id, name, semester, academic_status)
+        values (demo_tenant_id, demo_course_id, (subject_ids->>(item->>'subject'))::uuid,
+          (period_ids->>(item->>'period'))::uuid, demo_auth_id, item->>'name', (item->>'semester')::integer, 'active')
+        returning * into class_row;
+    end;
+    if class_row.course_id <> demo_course_id or class_row.teacher_id is distinct from demo_auth_id
+      or class_row.subject_id is distinct from (subject_ids->>(item->>'subject'))::uuid
+      or class_row.academic_period_id is distinct from (period_ids->>(item->>'period'))::uuid
+      or class_row.academic_status <> 'active' then
+      raise exception 'Demo class mapping, teacher or status conflicts with existing records; review manually.';
+    end if;
+    class_ids := class_ids || jsonb_build_object(item->>'key', class_row.id);
+
+    -- Additional teachers are not primary; never write is_primary outside the class trigger.
+    for extra_teacher in select value from jsonb_array_elements(item->'additional_teachers') loop
+      demo_teacher_id := (member_ids->>(extra_teacher #>> '{}'))::uuid;
+      insert into public.teaching_assignments (tenant_id, class_id, teacher_id, status)
+        values (demo_tenant_id, class_row.id, demo_teacher_id, 'active')
+        on conflict (tenant_id, class_id, teacher_id) do nothing;
+      select * into strict assignment_row from public.teaching_assignments
+        where tenant_id = demo_tenant_id and class_id = class_row.id and teacher_id = demo_teacher_id;
+      if assignment_row.status <> 'active' then
+        raise exception 'Demo teaching assignment is inactive; preserve its history and review manually.';
+      end if;
+    end loop;
+  end loop;
+
+  for item in select value from jsonb_array_elements(fixtures->'enrollments') loop
+    demo_class_id := (class_ids->>(item->>'class'))::uuid;
+    demo_student_id := (member_ids->>(item->>'student'))::uuid;
+    insert into public.enrollments (tenant_id, class_id, student_id, status)
+      values (demo_tenant_id, demo_class_id, demo_student_id, 'active')
+      on conflict (tenant_id, class_id, student_id) do nothing;
+    select * into strict enrollment_row from public.enrollments
+      where tenant_id = demo_tenant_id and class_id = demo_class_id and student_id = demo_student_id;
+    if enrollment_row.status <> 'active' then
+      raise exception 'Demo enrollment is not active; do not overwrite academic history.';
+    end if;
+  end loop;
+
+  for item in select value from jsonb_array_elements(fixtures->'activities') loop
+    demo_class_id := (class_ids->>(item->>'class'))::uuid;
+    select * into strict class_row from public.classes where tenant_id = demo_tenant_id and id = demo_class_id;
+    select id into strict demo_teacher_id from public.app_users
+      where tenant_id = demo_tenant_id and auth_user_id = class_row.teacher_id and role = 'teacher' and active;
+    -- STRICT rejects duplicate titles within a class instead of choosing an arbitrary activity.
+    begin
+      select * into strict activity_row from public.activities
+        where tenant_id = demo_tenant_id and class_id = demo_class_id and title = item->>'title';
+    exception when no_data_found then
+      activity_row := null;
+    end;
+    if activity_row.id is null then
+      workflow_result := public.manage_academic_activity(
+        demo_tenant_id, demo_teacher_id, 'create', null, demo_class_id,
+        jsonb_build_object('title', item->>'title', 'description', item->>'description', 'type', item->>'type',
+          'due_date', now() + make_interval(days => (item->>'due_days')::integer),
+          'instructions', item->>'instructions', 'evaluation_criteria', item->>'evaluation_criteria'));
+      workflow_result := public.manage_academic_activity(
+        demo_tenant_id, demo_teacher_id, 'publish', (workflow_result->>'id')::uuid, demo_class_id,
+        jsonb_build_object('expected_version', (workflow_result->>'revision')::integer));
+      select * into strict activity_row from public.activities
+        where tenant_id = demo_tenant_id and id = (workflow_result->>'id')::uuid;
+    end if;
+    if not activity_row.workflow_enabled or activity_row.state not in ('published', 'closed') then
+      raise exception 'Existing demo activity is legacy or unpublished; do not rewrite its history.';
+    end if;
+    activity_ids := activity_ids || jsonb_build_object(item->>'key', activity_row.id);
+  end loop;
+
+  for item in select value from jsonb_array_elements(fixtures->'deliveries') loop
+    select * into strict activity_row from public.activities
+      where tenant_id = demo_tenant_id and id = (activity_ids->>(item->>'activity'))::uuid;
+    select * into strict class_row from public.classes where tenant_id = demo_tenant_id and id = activity_row.class_id;
+    select id into strict demo_teacher_id from public.app_users
+      where tenant_id = demo_tenant_id and auth_user_id = class_row.teacher_id and role = 'teacher' and active;
+    demo_student_id := (member_ids->>(item->>'student'))::uuid;
+    select * into delivery_row from public.activity_submissions
+      where tenant_id = demo_tenant_id and activity_id = activity_row.id and student_id = demo_student_id;
+    select * into grade_row from public.grades
+      where tenant_id = demo_tenant_id and activity_id = activity_row.id and student_id = (auth_ids->>(item->>'student'))::uuid;
+    delivery_created := false;
+    -- Never resubmit, regrade or publish a participant's existing work on repetition.
+    if delivery_row.id is null and grade_row.id is null then
+      workflow_result := public.submit_activity_answer(demo_tenant_id, demo_student_id, activity_row.id, 0, item->>'answer');
+      select * into strict delivery_row from public.activity_submissions
+        where tenant_id = demo_tenant_id and id = (workflow_result->>'id')::uuid;
+      delivery_created := true;
+    end if;
+    if grade_row.id is null and delivery_created and item->>'review' <> 'pending' then
+      workflow_result := public.review_activity_submission(
+        demo_tenant_id, demo_teacher_id, delivery_row.id, 0, delivery_row.current_version,
+        (item->>'grade')::numeric, item->>'feedback', false);
+      select * into strict grade_row from public.grades
+        where tenant_id = demo_tenant_id and id = (workflow_result->>'id')::uuid;
+      if item->>'review' = 'published' then
+        perform public.publish_activity_review(demo_tenant_id, demo_teacher_id, delivery_row.id, grade_row.revision);
+      end if;
+    end if;
+  end loop;
+
+  -- Preserve the legacy class-message fixtures; no inferred private conversations.
+  for item in select value from jsonb_array_elements(fixtures->'messages') loop
+    demo_class_id := (class_ids->>(item->>'class'))::uuid;
+    insert into public.messages (tenant_id, sender_id, class_id, content)
+      select demo_tenant_id, (member_ids->>(item->>'sender'))::uuid, demo_class_id, item->>'content'
+      where not exists (
+        select 1 from public.messages where tenant_id = demo_tenant_id and class_id = demo_class_id
+          and sender_id = (member_ids->>(item->>'sender'))::uuid and content = item->>'content' and conversation_id is null
       );
+  end loop;
 end $$;
-
-insert into public.app_users (
-  tenant_id,
-  auth_user_id,
-  name,
-  email,
-  role,
-  course,
-  registration,
-  semester
-)
-select
-  tenants.id,
-  auth_users.id,
-  users.name,
-  users.email,
-  users.role,
-  users.course,
-  users.registration,
-  users.semester
-from public.tenants tenants
-join (
-  values
-    ('admin@uniconnect.app', 'Admin UniConnect', 'admin', null, null, null),
-    ('gestor@edukmais.edu.br', 'Gestor EduKMais', 'admin', null, null, null),
-    ('coordenador@edukmais.edu.br', 'Coordenador Academico', 'coordinator', 'Engenharia de Software', null, null),
-    ('professor@edukmais.edu.br', 'Marina Costa', 'teacher', 'Engenharia de Software', null, null),
-    ('professor.comp@edukmais.edu.br', 'Prof. Computacao', 'teacher', 'Ciencia da Computacao', null, null),
-    ('professor.eng@edukmais.edu.br', 'Prof. Engenharia', 'teacher', 'Engenharia de Software', null, null),
-    ('professor.si@edukmais.edu.br', 'Prof. Sistemas', 'teacher', 'Sistemas de Informacao', null, null),
-    ('aluno@edukmais.edu.br', 'Lucas Oliveira', 'student', 'Engenharia de Software', '2024021845', 4),
-    ('aluno01@edukmais.edu.br', 'Aluno EduKMais 01', 'student', 'Engenharia de Software', '2026001001', 4),
-    ('aluno02@edukmais.edu.br', 'Aluno EduKMais 02', 'student', 'Engenharia de Software', '2026001002', 4),
-    ('aluno03@edukmais.edu.br', 'Aluno EduKMais 03', 'student', 'Ciencia da Computacao', '2026001003', 3),
-    ('aluno04@edukmais.edu.br', 'Aluno EduKMais 04', 'student', 'Ciencia da Computacao', '2026001004', 3),
-    ('aluno05@edukmais.edu.br', 'Aluno EduKMais 05', 'student', 'Sistemas de Informacao', '2026001005', 5)
-) as users(email, name, role, course, registration, semester)
-  on tenants.slug = 'edukmais'
-join auth.users auth_users
-  on auth_users.email = users.email
-on conflict (tenant_id, email) do update set
-  auth_user_id = excluded.auth_user_id,
-  name = excluded.name,
-  role = excluded.role,
-  course = excluded.course,
-  registration = excluded.registration,
-  semester = excluded.semester,
-  updated_at = now();
-
-insert into public.courses (tenant_id, name, description)
-select tenants.id, courses.name, courses.description
-from public.tenants tenants
-join (
-  values
-    ('Ciencia da Computacao', 'Bacharelado com foco em algoritmos, dados e sistemas computacionais.'),
-    ('Engenharia de Software', 'Bacharelado com foco em produto, arquitetura e qualidade de software.'),
-    ('Sistemas de Informacao', 'Bacharelado com foco em processos, gestao e sistemas corporativos.')
-) as courses(name, description)
-  on tenants.slug = 'edukmais';
-
-insert into public.classes (tenant_id, course_id, name, teacher_id, semester)
-select
-  tenants.id,
-  courses.id,
-  classes.name,
-  teachers.auth_user_id,
-  classes.semester
-from public.tenants tenants
-join (
-  values
-    ('Engenharia de Software', 'Engenharia de Software II - 2026.1 Turma A', 'professor.eng@edukmais.edu.br', 4),
-    ('Engenharia de Software', 'Banco de Dados - 2026.1 Turma A', 'professor.eng@edukmais.edu.br', 4),
-    ('Ciencia da Computacao', 'Algoritmos e Estruturas de Dados - 2026.1 Turma B', 'professor.comp@edukmais.edu.br', 3),
-    ('Sistemas de Informacao', 'Gestao de Projetos de Software - 2026.1 Turma A', 'professor.si@edukmais.edu.br', 5)
-) as classes(course_name, name, teacher_email, semester)
-  on tenants.slug = 'edukmais'
-join public.courses courses
-  on courses.tenant_id = tenants.id
-  and courses.name = classes.course_name
-join public.app_users teachers
-  on teachers.tenant_id = tenants.id
-  and teachers.email = classes.teacher_email;
-
-insert into public.activities (
-  tenant_id,
-  class_id,
-  title,
-  description,
-  due_date,
-  type,
-  created_by
-)
-select
-  classes.tenant_id,
-  classes.id,
-  activities.title,
-  activities.description,
-  activities.due_date,
-  activities.type,
-  teachers.auth_user_id
-from public.classes classes
-join (
-  values
-    ('Engenharia de Software II - 2026.1 Turma A', 'Documento de requisitos', 'Mapear requisitos funcionais e nao funcionais do estudo de caso.', now() + interval '7 days', 'assignment'),
-    ('Engenharia de Software II - 2026.1 Turma A', 'Prototipo navegavel', 'Entregar fluxo principal validado com usuarios demo.', now() + interval '14 days', 'project'),
-    ('Banco de Dados - 2026.1 Turma A', 'Modelagem entidade-relacionamento', 'Criar o modelo ER do sistema proposto.', now() + interval '10 days', 'assignment'),
-    ('Banco de Dados - 2026.1 Turma A', 'Normalizacao de tabelas', 'Aplicar as tres primeiras formas normais no modelo entregue.', now() + interval '17 days', 'assignment'),
-    ('Algoritmos e Estruturas de Dados - 2026.1 Turma B', 'Lista de arvores binaria', 'Resolver exercicios de insercao, busca e percurso.', now() + interval '9 days', 'assignment'),
-    ('Gestao de Projetos de Software - 2026.1 Turma A', 'Plano de sprint', 'Planejar backlog, responsaveis e criterios de aceite.', now() + interval '12 days', 'assignment')
-) as activities(class_name, title, description, due_date, type)
-  on activities.class_name = classes.name
-join public.app_users teachers
-  on teachers.tenant_id = classes.tenant_id
-  and teachers.auth_user_id = classes.teacher_id;
-
-insert into public.grades (
-  tenant_id,
-  activity_id,
-  student_id,
-  grade,
-  feedback,
-  graded_at,
-  graded_by
-)
-select
-  activities.tenant_id,
-  activities.id,
-  students.auth_user_id,
-  grades.grade,
-  grades.feedback,
-  now() - interval '1 day',
-  activities.created_by
-from public.activities activities
-join (
-  values
-    ('Documento de requisitos', 'aluno@edukmais.edu.br', 8.80, 'Boa cobertura dos requisitos. Revisar prioridades.'),
-    ('Documento de requisitos', 'aluno01@edukmais.edu.br', 8.80, 'Boa cobertura dos requisitos. Revisar prioridades.'),
-    ('Documento de requisitos', 'aluno02@edukmais.edu.br', 9.20, 'Documento claro e bem organizado.'),
-    ('Modelagem entidade-relacionamento', 'aluno01@edukmais.edu.br', 8.50, 'Boa modelagem. Revisar cardinalidades.'),
-    ('Modelagem entidade-relacionamento', 'aluno@edukmais.edu.br', 8.50, 'Boa modelagem. Revisar cardinalidades.'),
-    ('Modelagem entidade-relacionamento', 'aluno02@edukmais.edu.br', 7.90, 'Modelo correto, mas faltam justificativas.'),
-    ('Lista de arvores binaria', 'aluno03@edukmais.edu.br', 9.00, 'Solucoes eficientes.'),
-    ('Lista de arvores binaria', 'aluno04@edukmais.edu.br', 8.10, 'Revisar complexidade do percurso.'),
-    ('Plano de sprint', 'aluno05@edukmais.edu.br', 8.70, 'Backlog coerente com o escopo.')
-) as grades(activity_title, student_email, grade, feedback)
-  on grades.activity_title = activities.title
-join public.app_users students
-  on students.tenant_id = activities.tenant_id
-  and students.email = grades.student_email;
-
-insert into public.messages (tenant_id, sender_id, class_id, content)
-select
-  classes.tenant_id,
-  senders.id,
-  classes.id,
-  messages.content
-from public.classes classes
-join (
-  values
-    ('Engenharia de Software II - 2026.1 Turma A', 'professor.eng@edukmais.edu.br', 'Pessoal, o documento de requisitos deve seguir o template discutido em aula.'),
-    ('Engenharia de Software II - 2026.1 Turma A', 'aluno01@edukmais.edu.br', 'Professor, podemos incluir requisitos de acessibilidade no escopo?'),
-    ('Banco de Dados - 2026.1 Turma A', 'professor.eng@edukmais.edu.br', 'A entrega de modelagem ER sera avaliada pela consistencia das relacoes.'),
-    ('Algoritmos e Estruturas de Dados - 2026.1 Turma B', 'professor.comp@edukmais.edu.br', 'Revisem percurso em ordem, pre-ordem e pos-ordem antes da lista.')
-) as messages(class_name, sender_email, content)
-  on messages.class_name = classes.name
-join public.app_users senders
-  on senders.tenant_id = classes.tenant_id
-  and senders.email = messages.sender_email;

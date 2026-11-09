@@ -1,6 +1,14 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+export function isSafeAuthRedirectUrl(value: string, nodeEnv: string) {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || /^\w+:\/\/[^/]*@/.test(value) || value.includes('?') || value.includes('#')) return false;
+    return url.protocol === 'https:' || (nodeEnv !== 'production' && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch { return false; }
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -8,14 +16,23 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3333),
   HOST: z.string().default('0.0.0.0'),
   API_VERSION: z.string().default('v1'),
-  APP_ORIGIN: z
-    .string()
-    .default(
-      'http://127.0.0.1:8080,http://localhost:8080,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:5173,http://localhost:5173',
-    ),
+  APP_ORIGIN: z.string().default(''),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  AUTH_RECOVERY_REDIRECT_URL: z.string().url().optional(),
+  AUTH_INVITE_REDIRECT_URL: z.string().url().optional(),
+  PLATFORM_ADMIN_AUTH_USER_IDS: z.string().default('').transform((value) =>
+    value.split(',').map((id) => id.trim()).filter(Boolean).map((id) => z.guid().parse(id)),
+  ),
+  ACADEMIC_PROVIDER: z.enum(['disabled', 'demo', 'native']).default('disabled'),
+  ACADEMIC_DEMO_TENANT_SLUG: z.string().trim().min(1).max(64).default('edukmais'),
+}).superRefine((value, context) => {
+  for (const key of ['AUTH_RECOVERY_REDIRECT_URL', 'AUTH_INVITE_REDIRECT_URL'] as const) {
+    if (value[key] && !isSafeAuthRedirectUrl(value[key], value.NODE_ENV)) {
+      context.addIssue({ code: 'custom', path: [key], message: 'Configure HTTPS sem credenciais, query ou fragmento; HTTP loopback somente fora de producao.' });
+    }
+  }
 });
 
 export const env = envSchema.parse(process.env);
