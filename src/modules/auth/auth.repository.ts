@@ -1,6 +1,8 @@
+import { checkQueryError, requireRows } from '../../shared/supabase-errors';
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 import { AppUser } from '../../shared/types';
+import { canAccessPlatform } from '../../shared/roles';
 
 type AppUserRow = {
   id: string;
@@ -12,6 +14,8 @@ type AppUserRow = {
   course: string | null;
   registration: string | null;
   semester: number | null;
+  active: boolean;
+  course_id: string | null;
 };
 
 function mapAppUser(row: AppUserRow): AppUser {
@@ -22,6 +26,8 @@ function mapAppUser(row: AppUserRow): AppUser {
     name: row.name,
     email: row.email,
     role: row.role,
+    active: row.active !== false,
+    courseId: row.course_id ?? undefined,
     course: row.course ?? undefined,
     registration: row.registration ?? undefined,
     semester: row.semester ?? undefined,
@@ -35,16 +41,17 @@ export class AuthRepository {
     authUserId: string;
     tenantId: string;
   }): Promise<AppUser> {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('app_users')
       .select(
-        'id,tenant_id,auth_user_id,name,email,role,course,registration,semester',
+        'id,tenant_id,auth_user_id,name,email,role,course,course_id,registration,semester,active',
       )
       .eq('auth_user_id', params.authUserId)
       .eq('tenant_id', params.tenantId)
-      .single<AppUserRow>();
+      .maybeSingle<AppUserRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         403,
         'USER_NOT_LINKED_TO_TENANT',
@@ -53,18 +60,21 @@ export class AuthRepository {
       );
     }
 
+    if (data.active === false) throw new HttpError(403, 'USER_INACTIVE', 'Vinculo institucional desativado.');
     return mapAppUser(data);
   }
 
   async findAnyUserByAuthId(authUserId: string): Promise<AppUser> {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('app_users')
       .select(
-        'id,tenant_id,auth_user_id,name,email,role,course,registration,semester',
+        'id,tenant_id,auth_user_id,name,email,role,course,course_id,registration,semester,active',
       )
       .eq('auth_user_id', authUserId);
 
-    if (error || !data?.length) {
+    checkQueryError(error, status);
+    requireRows(data);
+    if (!data?.length) {
       throw new HttpError(
         403,
         'USER_NOT_LINKED_TO_TENANT',
@@ -73,10 +83,14 @@ export class AuthRepository {
       );
     }
 
+    const rows = data as AppUserRow[];
+    const activeRows = rows.filter(row => row.active !== false);
+    const eligible = activeRows.length ? activeRows : canAccessPlatform(authUserId) ? rows : [];
+    if (!eligible.length) throw new HttpError(403, 'USER_INACTIVE', 'Vinculo institucional desativado.');
     const user =
-      (data as AppUserRow[]).find((row) =>
+      eligible.find((row) =>
         ['admin', 'owner'].includes(row.role),
-      ) ?? (data as AppUserRow[])[0];
+      ) ?? eligible[0];
 
     return mapAppUser(user);
   }
@@ -85,16 +99,17 @@ export class AuthRepository {
     email: string;
     tenantId: string;
   }): Promise<AppUser> {
-    const { data, error } = await this.supabase
+    const { data, error, status } = await this.supabase
       .from('app_users')
       .select(
-        'id,tenant_id,auth_user_id,name,email,role,course,registration,semester',
+        'id,tenant_id,auth_user_id,name,email,role,course,course_id,registration,semester,active',
       )
       .eq('email', params.email)
       .eq('tenant_id', params.tenantId)
-      .single<AppUserRow>();
+      .maybeSingle<AppUserRow>();
 
-    if (error || !data) {
+    checkQueryError(error, status);
+    if (!data) {
       throw new HttpError(
         403,
         'USER_NOT_LINKED_TO_TENANT',
@@ -103,6 +118,7 @@ export class AuthRepository {
       );
     }
 
+    if (data.active === false) throw new HttpError(403, 'USER_INACTIVE', 'Vinculo institucional desativado.');
     return mapAppUser(data);
   }
 }

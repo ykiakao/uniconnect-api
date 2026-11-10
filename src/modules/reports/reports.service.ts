@@ -1,5 +1,6 @@
 import { HttpError } from '../../shared/http-error';
-import { canManageTenant } from '../../shared/roles';
+import { canAccessPlatform, canManageTenant } from '../../shared/roles';
+import { PlatformPrincipal } from '../../shared/authorization';
 import { AppUser } from '../../shared/types';
 import { ReportsRepository } from './reports.repository';
 
@@ -22,8 +23,8 @@ export class ReportsService {
     return this.repository.engagement(params);
   }
 
-  async global(currentUser: AppUser) {
-    if (currentUser.role !== 'admin' && currentUser.role !== 'owner') {
+  async global(currentUser: PlatformPrincipal) {
+    if (currentUser.scope !== 'platform' || !canAccessPlatform(currentUser.authUserId)) {
       throw new HttpError(403, 'FORBIDDEN', 'Acesso nÃ£o permitido');
     }
 

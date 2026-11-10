@@ -4,6 +4,8 @@ import { canManageTenant } from '../../shared/roles';
 import { AppUser } from '../../shared/types';
 import { CoursesRepository } from '../courses/courses.repository';
 import { ClassesRepository, ClassResponse } from './classes.repository';
+import { AcademicAccess } from '../../shared/academic-access';
+import { UsersRepository } from '../users/users.repository';
 
 export class ClassesService {
   private readonly classesRepository = new ClassesRepository();
@@ -20,10 +22,8 @@ export class ClassesService {
       id: params.courseId,
     });
 
-    if (
-      params.currentUser.role === 'student' &&
-      course.name !== params.currentUser.course
-    ) {
+    const classIds = await new AcademicAccess().classIds(params.currentUser, params.tenantId);
+    if (classIds?.length === 0) {
       return toPaginated<ClassResponse>({
         data: [],
         total: 0,
@@ -35,10 +35,7 @@ export class ClassesService {
     const { classes, total } = await this.classesRepository.listByCourse({
       tenantId: params.tenantId,
       courseId: params.courseId,
-      teacherAuthUserId:
-        params.currentUser.role === 'teacher'
-          ? params.currentUser.authUserId
-          : undefined,
+      classIds,
       pagination: params.pagination,
     });
 
@@ -67,7 +64,7 @@ export class ClassesService {
       tenantId: params.tenantId,
       courseId: params.courseId,
       name: params.name,
-      teacherId: params.teacherId,
+      teacherId: await this.validateTeacher(params.tenantId, params.teacherId),
     });
   }
 
@@ -76,31 +73,12 @@ export class ClassesService {
     tenantId: string;
     id: string;
   }) {
-    if (params.currentUser.role === 'student') {
-      const classItem = await this.classesRepository.findById({
-        tenantId: params.tenantId,
-        id: params.id,
-      });
-      const course = await this.coursesRepository.findById({
-        tenantId: params.tenantId,
-        id: classItem.courseId,
-      });
-
-      if (course.name !== params.currentUser.course) {
-        throw new HttpError(404, 'CLASS_NOT_FOUND', 'Turma não encontrada.');
-      }
-
-      return classItem;
-    }
-
-    return this.classesRepository.findById({
+    const classItem = await this.classesRepository.findById({
       tenantId: params.tenantId,
       id: params.id,
-      teacherAuthUserId:
-        params.currentUser.role === 'teacher'
-          ? params.currentUser.authUserId
-          : undefined,
     });
+    await new AcademicAccess().require(params.currentUser, params.tenantId, classItem.id);
+    return classItem;
   }
 
   async update(params: {
@@ -111,12 +89,13 @@ export class ClassesService {
     teacherId?: string;
   }) {
     this.ensureCanManageClasses(params.currentUser);
+    const existing = await this.classesRepository.findById({ tenantId: params.tenantId, id: params.id });
 
     return this.classesRepository.update({
       tenantId: params.tenantId,
       id: params.id,
       name: params.name,
-      teacherId: params.teacherId,
+      teacherId: await this.validateTeacher(params.tenantId, params.teacherId ?? existing.teacherId),
     });
   }
 
@@ -126,6 +105,7 @@ export class ClassesService {
     id: string;
   }) {
     this.ensureCanManageClasses(params.currentUser);
+    await new AcademicAccess().preserveRecords(params.tenantId, ['activities', 'enrollments', 'teaching_assignments'].map(table => ({ table, field: 'class_id', id: params.id })));
     await this.classesRepository.delete({
       tenantId: params.tenantId,
       id: params.id,
@@ -136,5 +116,12 @@ export class ClassesService {
     if (!canManageTenant(user.role)) {
       throw new HttpError(403, 'FORBIDDEN', 'Acesso não permitido');
     }
+  }
+
+  private async validateTeacher(tenantId: string, identifier?: string) {
+    if (identifier === undefined) return undefined;
+    const teacher = await new UsersRepository().findAcademicMember({ tenantId, identifier, role: 'teacher' });
+    if (teacher.active === false) throw new HttpError(409, 'MEMBER_INACTIVE', 'Docente institucional inativo.');
+    return teacher.authUserId;
   }
 }

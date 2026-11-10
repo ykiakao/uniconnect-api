@@ -8,7 +8,7 @@ import { ClassesService } from './classes.service';
 
 const classSchema = z.object({
   name: z.string().trim().min(1),
-  teacherId: z.string().uuid().optional(),
+  teacherId: z.guid().optional(),
 });
 
 const classesService = new ClassesService();

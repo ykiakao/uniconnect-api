@@ -1,9 +1,12 @@
+import { AcademicAccess } from '../../shared/academic-access';
+import { UsersRepository } from '../users/users.repository';
 import { ActivitiesRepository } from '../activities/activities.repository';
 import { ClassesRepository } from '../classes/classes.repository';
 import { HttpError } from '../../shared/http-error';
 import { canManageTenant } from '../../shared/roles';
 import { AppUser } from '../../shared/types';
 import { GradesRepository } from './grades.repository';
+import { SubmissionsRepository } from '../activities/activities.submissions.repository';
 
 export class GradesService {
   private readonly activitiesRepository = new ActivitiesRepository();
@@ -33,7 +36,15 @@ export class GradesService {
     grade: number;
     feedback?: string;
   }) {
-    await this.ensureCanManageActivityGrades(params);
+    const activity = await this.ensureCanManageActivityGrades(params);
+    const student = await new UsersRepository().findAcademicMember({ tenantId: params.tenantId, identifier: params.studentId, role: 'student' });
+    await new AcademicAccess().requireStudent(params.tenantId, student.id, activity.classId);
+    if (activity.state==='draft') throw new HttpError(409,'ACTIVITY_NOT_PUBLISHED','Publique a atividade antes de registrar notas.');
+    if (await new SubmissionsRepository().own(params.tenantId,activity.id,student.id)) throw new HttpError(409,'USE_SUBMISSION_REVIEW','Avalie a entrega pelo fluxo de correcao.');
+    if (activity.workflowEnabled) {
+      const grade=await new SubmissionsRepository().recordManual(params.tenantId,params.currentUser.id,activity.id,student.id,params.grade,params.feedback??null);
+      return {studentId:student.authUserId,grade:grade.grade,feedback:grade.feedback??undefined,gradedAt:grade.graded_at};
+    }
 
     return this.gradesRepository.upsert({
       tenantId: params.tenantId,
@@ -67,6 +78,7 @@ export class GradesService {
         data: await this.gradesRepository.listByStudent({
           tenantId: params.tenantId,
           studentId: params.studentId,
+          publishedOnly: true,
         }),
       };
     }
@@ -80,6 +92,7 @@ export class GradesService {
         tenantId: params.tenantId,
         studentId: params.studentId,
         teacherAuthUserId,
+        classIds: params.currentUser.role === 'teacher' ? await new AcademicAccess().classIds(params.currentUser, params.tenantId) : undefined,
       }),
     };
   }
@@ -94,16 +107,15 @@ export class GradesService {
       id: params.activityId,
     });
 
-    if (canManageTenant(params.currentUser.role)) return;
-
-    if (params.currentUser.role !== 'teacher') {
-      throw new HttpError(403, 'FORBIDDEN', 'Acesso nÃ£o permitido');
+    if (!canManageTenant(params.currentUser.role)) {
+      if (params.currentUser.role !== 'teacher') {
+        throw new HttpError(403, 'FORBIDDEN', 'Acesso nÃ£o permitido');
+      }
+      await new AcademicAccess().require(params.currentUser, params.tenantId, activity.classId);
     }
-
-    await this.classesRepository.findById({
-      tenantId: params.tenantId,
-      id: activity.classId,
-      teacherAuthUserId: params.currentUser.authUserId,
-    });
+    if (activity.assessment?.category === 'exam') {
+      throw new HttpError(409, 'USE_EXAM_GRADES', 'Use o fluxo de notas de prova.');
+    }
+    return activity;
   }
 }

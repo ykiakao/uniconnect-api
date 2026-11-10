@@ -22,6 +22,8 @@ export type AppUser = {
   name: string;
   email: string;
   role: UserRole;
+  active?: boolean;
+  courseId?: string;
   course?: string;
   registration?: string;
   semester?: number;

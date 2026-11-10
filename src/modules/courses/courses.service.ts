@@ -3,6 +3,7 @@ import { Pagination, toPaginated } from '../../shared/pagination';
 import { canManageTenant } from '../../shared/roles';
 import { AppUser } from '../../shared/types';
 import { CourseResponse, CoursesRepository } from './courses.repository';
+import { AcademicAccess } from '../../shared/academic-access';
 
 export class CoursesService {
   private readonly repository = new CoursesRepository();
@@ -47,10 +48,12 @@ export class CoursesService {
     tenantId: string;
     id: string;
   }) {
-    return this.repository.findByIdWithClasses({
+    const course = await this.repository.findByIdWithClasses({
       tenantId: params.tenantId,
       id: params.id,
     });
+    const classIds = await new AcademicAccess().classIds(params.currentUser, params.tenantId);
+    return { ...course, classes: course.classes.filter(item => classIds === undefined || classIds.includes(item.id)) };
   }
 
   async update(params: {
@@ -76,6 +79,7 @@ export class CoursesService {
     id: string;
   }) {
     this.ensureCanManageCourses(params.currentUser);
+    await new AcademicAccess().preserveRecords(params.tenantId, ['classes', 'subjects'].map(table => ({ table, field: 'course_id', id: params.id })));
     await this.repository.delete({
       tenantId: params.tenantId,
       id: params.id,

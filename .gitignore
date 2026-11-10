@@ -9,6 +9,9 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.homologation.example
+!.env.homologation-migrations.example
+homologation-migrations.local.json
 
 # Supabase local
 .supabase/
@@ -37,3 +40,17 @@ verify-kit.ps1
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Private handoff material
+certs/
+cksca
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+*.zip
+*.har
+docs/evidence/
+*gitleaks*.json
