@@ -1,6 +1,6 @@
 # UniConnect · API
 
-API REST multi-instituição do TCC UniConnect. Centraliza autenticação, autorização e dados acadêmicos para o aplicativo Flutter e o painel administrativo React. Referência técnica da consolidação local em **09/11/2026**. Veja o [relatório de publicação e validação](docs/handoff-api-2026-11-04.md) e o [contrato HTTP + Realtime do chat para Flutter](docs/chat-realtime.md).
+API REST multi-instituição do TCC UniConnect. Centraliza autenticação, autorização e dados acadêmicos para o aplicativo Flutter e o painel administrativo React. Documentação operacional revisada em **12/11/2026**; evidências históricas permanecem nos documentos de handoff. Veja o [relatório de publicação e validação](docs/handoff-api-2026-11-04.md) e o [contrato HTTP + Realtime do chat para Flutter](docs/chat-realtime.md).
 
 ## Stack e arquitetura
 
@@ -80,19 +80,21 @@ A suíte usa Jest e Supertest para exercitar regras e contratos HTTP. Scripts de
 
 ## Ambientes e operação
 
+O deploy atual é feito por **Portainer/Docker Compose**, não por Render ou Railway. Os arquivos de configuração específicos desses provedores foram removidos. A documentação histórica pode citar provedores ou estados anteriores; não deve ser usada como fonte única da configuração ativa.
+
 | Ambiente | Estado e procedimento |
 | --- | --- |
 | Local | Configuração privada e base separada, ou harness descartável em loopback. A inicialização normal da API não aplica migrations automaticamente |
-| Homologação | O rollout segue em **NO-GO**. As quatro migrations acadêmicas adicionais foram revisadas estaticamente e continuam pendentes de validação neste ambiente. Qualquer conexão, ensaio ou aplicação depende do procedimento e da autorização do ambiente |
-| Produção | A implantação informada pelo operador utiliza Portainer. [`Dockerfile`](Dockerfile), [`.dockerignore`](.dockerignore) e [`docker-compose.yml`](docker-compose.yml) são preservados da `main`. `render.yaml` e `railway.json` são configurações legadas; sua presença não comprova implantação nesses serviços. Commit e imagem em execução precisam ser conferidos no Portainer antes de qualquer atualização |
+| Base de teste (`uniconnect-test`) | Projeto Supabase de teste usado na demonstração (`edukmais`). Mudanças de schema, seeds e policies exigem autorização própria; a implantação da API não executa migrations automaticamente |
+| API pública (Portainer) | `https://api-uni.juancjc.com.br/api/v1` é o endereço utilizado pelos clientes. A stack usa [`Dockerfile`](Dockerfile), [`.dockerignore`](.dockerignore) e [`docker-compose.yml`](docker-compose.yml). A instância atualmente configurada utiliza o projeto Supabase de teste; isso **não** significa implantação no projeto Supabase de produção. Antes de atualizar a stack, verificar commit, imagem, variáveis e destino efetivos no Portainer |
 
 ### Docker / Portainer
 
 O Compose mantém o serviço `uniconnect-api`, build local com Node 22, usuário de runtime `node` e mapeamento `${API_EXTERNAL_PORT:-3333}:3333`. A porta interna continua sendo 3333. O Docker healthcheck usa `GET /api/v1/health` (liveness). `GET /api/v1/health/ready` executa somente uma consulta de disponibilidade em `tenants`, responde 200 com `database.status=ok` ou 503 sem detalhes internos da dependência.
 
-As variáveis da stack são `API_EXTERNAL_PORT` (padrão 3333), `NODE_ENV` (padrão production), `API_VERSION` (padrão v1), `APP_ORIGIN` e as três variáveis obrigatórias `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Configure as origens reais explicitamente; a chave privilegiada fica somente no servidor. Nenhum segredo é incluído nos exemplos versionados.
+As variáveis da stack incluem `API_EXTERNAL_PORT` (padrão 3333), `NODE_ENV` (padrão production), `API_VERSION` (padrão v1), `APP_ORIGIN`, `PLATFORM_ADMIN_AUTH_USER_IDS`, `ACADEMIC_PROVIDER` e as três variáveis obrigatórias `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Configure as origens reais explicitamente; a chave privilegiada fica somente no servidor. Nenhum segredo é incluído nos exemplos versionados.
 
-O Compose atual não encaminha `PLATFORM_ADMIN_AUTH_USER_IDS`, `ACADEMIC_PROVIDER`, `ACADEMIC_DEMO_TENANT_SLUG`, `AUTH_RECOVERY_REDIRECT_URL` ou `AUTH_INVITE_REDIRECT_URL`. Se essas capacidades forem necessárias no destino, a passagem de configuração requer revisão e autorização separadas. Não altere a stack para validar esta branch.
+O Compose atual encaminha `PLATFORM_ADMIN_AUTH_USER_IDS` e `ACADEMIC_PROVIDER` (padrão `disabled`); na stack de demonstração, `ACADEMIC_PROVIDER=native` foi configurado no Portainer. O Compose **não** encaminha explicitamente `ACADEMIC_DEMO_TENANT_SLUG`, `AUTH_RECOVERY_REDIRECT_URL` ou `AUTH_INVITE_REDIRECT_URL`. Se necessárias, essas variáveis exigem revisão e autorização antes de alterar a stack.
 
 Antes de um deploy futuro, conferir a branch monitorada, webhooks/atualização automática, imagem e configuração do projeto de destino. Publicar ou integrar código não autoriza deploy ou SQL. O envio do chat exige o script versionado `supabase/scripts/chat-realtime-broadcast.sql` no banco de destino; sua aplicação na base de teste não comprova disponibilidade em produção. Inicializar a API ou construir a imagem não aplica migrations.
 
@@ -100,7 +102,7 @@ Antes de um deploy futuro, conferir a branch monitorada, webhooks/atualização 
 
 `GET /api/v1/tenants/:slug/users?role=aluno&page=1&limit=20&search=nome` usa Bearer e `x-tenant-slug` correspondentes. Admite `owner`, `admin` e `coordinator`; professor e aluno não têm acesso ao diretório administrativo. A resposta é `{ data, meta: { page, limit, total } }`, com limite máximo de 100. Busca por nome/e-mail e papel são os filtros existentes. `courseId` e `classId` não são filtros dessa rota. Matrículas por turma usam `/tenants/:slug/enrollments?classId=<UUID>` e retornam identificadores institucionais, sem ampliar a autorização do diretório.
 
-### Seed de homologação
+### Seed de ambiente de teste (script histórico)
 
 O seed exige um arquivo de ambiente privado explícito, separado do `.env` padrão. O script valida ambiente e identidade do projeto, o destino do DSN PostgreSQL, TLS com verificação de certificado e hostname e acesso administrativo ao Auth. Configure os valores de `UNICONNECT_ENVIRONMENT`, `SUPABASE_PROJECT_REF`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL` e as senhas sintéticas exigidas pelo script nesse arquivo. Use `SUPABASE_DB_CA_FILE` se o ambiente exigir CA própria. O usuário do DSN deve corresponder à conexão direta ou ao pooler autorizado. Mantenha o arquivo fora do Git.
 
