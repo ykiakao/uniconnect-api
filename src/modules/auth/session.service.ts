@@ -3,7 +3,7 @@ import { createPlatformPrincipal, platformAuthorization } from '../../shared/aut
 import { checkAuthError, checkSupabaseAvailability } from '../../shared/supabase-errors';
 import { HttpError } from '../../shared/http-error';
 import { Tenant } from '../../shared/types';
-import { toApiUserRole } from '../../shared/roles';
+import { toAuthUserResponse } from './auth.dto';
 import { TenantRepository } from '../tenants/tenant.repository';
 import { AuthRepository } from './auth.repository';
 import { AuthOperationClientFactory, authOperation, requireCoherentSession, requireVerifiedIdentity, sessionTokens } from './session.client';
@@ -42,8 +42,7 @@ export class SessionService {
     if (params.administrative && !['owner', 'admin', 'coordinator'].includes(user.role)) {
       throw new HttpError(403, 'ADMIN_ACCESS_REQUIRED', 'Sessao sem permissao administrativa.');
     }
-    return { ...sessionTokens(session), user: { id: user.id, name: user.name, email: user.email,
-      role: toApiUserRole(user.role), tenantSlug: params.tenant.slug, course: user.course } };
+    return { ...sessionTokens(session), user: toAuthUserResponse({ user, tenantSlug: params.tenant.slug }) };
   }
 
   async refreshPlatform(refreshToken: string) {
