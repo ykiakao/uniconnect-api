@@ -21,6 +21,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
+COPY scripts/lib/academic-file-validation.cjs ./scripts/lib/academic-file-validation.cjs
+COPY scripts/lib/academic-pdf-budget.cjs ./scripts/lib/academic-pdf-budget.cjs
 
 USER node
 EXPOSE 3333

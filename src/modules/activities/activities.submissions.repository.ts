@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { env } from '../../config/env';
 import { createSupabaseAdminClient } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
 import { Pagination } from '../../shared/pagination';
@@ -37,8 +38,12 @@ export class SubmissionsRepository {
     const {data,error,status} = await this.db.from('grades').select(gradeColumns).eq('tenant_id',tenantId).in('submission_id',submissionIds);
     checkWorkflowError(error,status); return requireRows(data).map(row => parse(gradeSchema,row));
   }
-  async submit(tenantId: string, actorId: string, activityId: string, version: number, answer: string) {
-    return parse(submissionSchema,await activityRpc('submit_activity_answer',{p_tenant_id:tenantId,p_actor_id:actorId,p_activity_id:activityId,p_expected_version:version,p_answer:answer}));
+  async submit(tenantId: string, actorId: string, activityId: string, version: number, answer: string, attachmentIds: string[] = []) {
+    if (attachmentIds.length && env.ACADEMIC_ATTACHMENTS_MODE !== 'enabled') throw new HttpError(503,'ACADEMIC_ATTACHMENTS_UNAVAILABLE','Novos anexos estao indisponiveis.');
+    const enabled = env.ACADEMIC_ATTACHMENTS_MODE === 'enabled';
+    return parse(submissionSchema,await activityRpc(enabled ? 'submit_activity_answer_with_attachments' : 'submit_activity_answer',{
+      p_tenant_id:tenantId,p_actor_id:actorId,p_activity_id:activityId,p_expected_version:version,p_answer:answer,...(enabled ? {p_attachment_ids:attachmentIds} : {}),
+    }));
   }
   async review(tenantId: string, actorId: string, submissionId: string, input: {expectedRevision:number;submissionVersion:number;grade:number|null;feedback:string|null;publish:boolean}) {
     return parse(gradeSchema,await activityRpc('review_activity_submission',{p_tenant_id:tenantId,p_actor_id:actorId,p_submission_id:submissionId,p_expected_revision:input.expectedRevision,p_submission_version:input.submissionVersion,p_grade:input.grade,p_feedback:input.feedback,p_publish:input.publish}));

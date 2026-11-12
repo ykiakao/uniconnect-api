@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { structureRoutes } from './modules/academic-structure/academic-structure.routes';
 import { Resources } from './modules/academic-structure/academic-structure.schemas';
 import { env } from './config/env';
+import { academicAttachmentsRoutes } from './modules/attachments/attachments.routes';
 import { RouteRegistry } from './observability/route-registry';
 
 import { authRoutes } from './modules/auth/auth.routes';
@@ -59,6 +60,7 @@ mount('/auth', publicRecoveryRoutes, platformRoutes);
 mount('/platform/institutions/:institutionId', platformAccountsRoutes, platformRoutes);
 mount('/platform/institutions', platformInstitutionsRoutes, platformRoutes);
 mount('/tenants/:slug/notices', noticesRoutes);
+mount('/tenants/:slug', academicAttachmentsRoutes);
 mount('/tenants/:slug/conversations', conversationsRoutes);
 mount('/tenants/:slug/notifications', notificationsRoutes);
 mount('/tenants/:slug/activities/:activityId/submissions',activitySubmissionsRoutes);

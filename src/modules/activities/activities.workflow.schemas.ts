@@ -30,7 +30,7 @@ export const activityUpdateSchema = activityCreateSchema.omit({ state: true }).p
   expectedVersion: z.number().int().min(1).max(2147483646).optional(),
 }).strict().refine(input => Object.keys(input).some(key => key !== 'expectedVersion'), 'Informe uma alteracao.');
 export const versionSchema = z.object({ expectedVersion: z.number().int().min(1).max(2147483646) }).strict();
-export const answerSchema = z.object({ answer: z.string().trim().min(1).max(20000), expectedVersion: z.number().int().min(0).max(2147483646) }).strict();
+export const answerSchema = z.object({ answer: z.string().trim().min(1).max(20000), expectedVersion: z.number().int().min(0).max(2147483646), attachmentIds: z.array(z.guid()).max(5).refine(ids => new Set(ids).size === ids.length, 'Anexos repetidos.').optional() }).strict();
 export const reviewSchema = z.object({
   expectedRevision: z.number().int().min(0).max(2147483646), submissionVersion: z.number().int().min(1).max(2147483646),
   grade: z.number().finite().min(0).max(10).refine(value => {

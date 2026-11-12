@@ -7,6 +7,8 @@ import { ActivitiesRepository } from './activities.repository';
 import { ActivitiesService } from './activities.service';
 import { ReviewInput } from './activities.workflow.schemas';
 import { Review, Submission, SubmissionsRepository } from './activities.submissions.repository';
+import { env } from '../../config/env';
+import { AttachmentsRepository } from '../attachments/attachments.repository';
 
 export function reviewResponse(review: Review) { return {grade:review.grade,feedback:review.feedback,gradedAt:review.graded_at,revision:review.revision,publicationState:review.publication_state,submissionVersion:review.submission_version}; }
 function receipt(row:Submission, grade:Review|undefined, student:boolean) {
@@ -16,6 +18,12 @@ function receipt(row:Submission, grade:Review|undefined, student:boolean) {
 }
 export class SubmissionsService {
   private readonly repository = new SubmissionsRepository();
+  private async receipts(user:AppUser,tenantId:string,rows:Submission[],grades:Review[] = []) {
+    const results=rows.map(row=>receipt(row,grades.find(grade=>grade.submission_id===row.id),user.role==='student'));
+    if(env.ACADEMIC_ATTACHMENTS_MODE==='disabled') return results;
+    const files=await new AttachmentsRepository().versions({user,tenantId},rows.map(row=>({submissionId:row.id,version:row.current_version})));
+    return results.map((row,index)=>({...row,attachments:files[index].attachments}));
+  }
   private async staff(user:AppUser,tenantId:string,classId:string,correction=false) {
     if (user.tenantId!==tenantId || user.active===false || (correction ? user.role!=='teacher' : user.role!=='teacher'&&!canManageTenant(user.role))) throw new HttpError(403,'FORBIDDEN','Operacao academica nao autorizada.');
     await new AcademicAccess().require(user,tenantId,classId);
@@ -27,31 +35,35 @@ export class SubmissionsService {
     } else await this.staff(user,tenantId,row.class_id,correction);
     return row;
   }
-  async submit(user:AppUser,tenantId:string,activityId:string,input:{answer:string;expectedVersion:number}) {
+  async submit(user:AppUser,tenantId:string,activityId:string,input:{answer:string;expectedVersion:number;attachmentIds?:string[]}) {
     if (user.role!=='student') throw new HttpError(403,'FORBIDDEN','Somente alunos podem enviar respostas.');
-    return receipt(await this.repository.submit(tenantId,user.id,activityId,input.expectedVersion,input.answer),undefined,true);
+    const row=await this.repository.submit(tenantId,user.id,activityId,input.expectedVersion,input.answer,input.attachmentIds);
+    return (await this.receipts(user,tenantId,[row]))[0];
   }
   async own(user:AppUser,tenantId:string,activityId:string) {
     if (user.role!=='student') throw new HttpError(403,'FORBIDDEN','Consulta pessoal restrita ao aluno.');
     await new ActivitiesService().findById({currentUser:user,tenantId,id:activityId});
     const row=await this.repository.own(tenantId,activityId,user.id);
-    return row ? receipt(row,(await this.repository.reviews(tenantId,[row.id]))[0],true) : {status:'not_submitted',submission:null};
+    return row ? (await this.receipts(user,tenantId,[row],await this.repository.reviews(tenantId,[row.id])))[0] : {status:'not_submitted',submission:null};
   }
   async find(user:AppUser,tenantId:string,id:string) {
     const row=await this.authorized(user,tenantId,id);
-    return receipt(row,(await this.repository.reviews(tenantId,[row.id]))[0],user.role==='student');
+    return (await this.receipts(user,tenantId,[row],await this.repository.reviews(tenantId,[row.id])))[0];
   }
   async list(user:AppUser,tenantId:string,activityId:string,pagination:Pagination) {
     const activity=await new ActivitiesRepository().findById({tenantId,id:activityId});
     await this.staff(user,tenantId,activity.classId);
     if (activity.assessment?.category==='exam') throw new HttpError(409,'EXAM_HAS_NO_SUBMISSIONS','Provas não recebem entregas.');
     const rows=await this.repository.list(tenantId,activityId,pagination);
-    const grades=new Map((await this.repository.reviews(tenantId,rows.data.map(row=>row.id))).map(grade=>[grade.submission_id,grade]));
-    return toPaginated({data:rows.data.map(row=>receipt(row,grades.get(row.id),false)),total:rows.total,page:pagination.page,limit:pagination.limit});
+    const grades=await this.repository.reviews(tenantId,rows.data.map(row=>row.id));
+    return toPaginated({data:await this.receipts(user,tenantId,rows.data,grades),total:rows.total,page:pagination.page,limit:pagination.limit});
   }
   async history(user:AppUser,tenantId:string,id:string,pagination:Pagination) {
     await this.authorized(user,tenantId,id);
-    return this.repository.history(tenantId,id,user.role==='student',pagination);
+    const result=await this.repository.history(tenantId,id,user.role==='student',pagination);
+    if(env.ACADEMIC_ATTACHMENTS_MODE==='disabled') return result;
+    const files=await new AttachmentsRepository().versions({user,tenantId},result.versions.map(row=>({submissionId:id,version:Number(row.version)})));
+    return {...result,versions:result.versions.map((row,index)=>({...row,attachments:files[index].attachments}))};
   }
   async review(user:AppUser,tenantId:string,id:string,input:ReviewInput) {
     await this.authorized(user,tenantId,id,true);
