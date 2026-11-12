@@ -3,26 +3,12 @@ import {
   createSupabaseAnonClient,
 } from '../../config/supabase';
 import { HttpError } from '../../shared/http-error';
-import { toApiUserRole } from '../../shared/roles';
-import { AppUser, AuthUserResponse, UserRole } from '../../shared/types';
+import { UserRole } from '../../shared/types';
 import { AuthRepository } from './auth.repository';
+import { toAuthUserResponse } from './auth.dto';
 import { checkAuthError, checkSupabaseAvailability, invalidAuthResponse, isAlreadyInvalidSession, isExistingAuthUser } from '../../shared/supabase-errors';
 
 const adminRoles = new Set<UserRole>(['admin', 'coordinator', 'owner']);
-
-function toAuthUserResponse(params: {
-  user: AppUser;
-  tenantSlug: string;
-}): AuthUserResponse {
-  return {
-    id: params.user.id,
-    name: params.user.name,
-    email: params.user.email,
-    role: toApiUserRole(params.user.role),
-    tenantSlug: params.tenantSlug,
-    course: params.user.course,
-  };
-}
 
 function toIsoExpiresAt(session: {
   expires_at?: number | null;
