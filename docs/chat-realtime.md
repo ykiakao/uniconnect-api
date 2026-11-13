@@ -1,6 +1,8 @@
 # Chat acadêmico — contrato HTTP + Broadcast privado
 
-Contrato de integração de 05/11/2026, branch `codex/integration-chat-realtime`, base `888744ecf4dc1f7b220ea9850c0f2bca0fa41c35`. O patch SQL já foi aplicado uma única vez em `uniconnect-test`; não reaplicar. API local, autenticação real, dois canais privados e recusa de tópico de outro destinatário foram validados. Envio, entrega de mensagens e recibos reais ainda não foram ensaiados. Isso não constitui aprovação de deploy. O consumidor Flutter ainda precisa ser implementado.
+**Estado em 13/11/2026:** o consumidor Flutter está implementado em `lib/features/communication/realtime/` no [repositório de clientes](https://github.com/ykiakao/uniconnect-clients). Mensagens/recibos continuam via HTTP; Broadcast privado sinaliza mudanças e a reconciliação HTTP recupera lacunas. Push Android FCM é separado e cobre somente atividade publicada. A presente revisão documental não executou novo ensaio real de mensagens/recibos ou alterações remotas.
+
+Registro histórico do contrato de 05/11/2026, branch `codex/integration-chat-realtime`, base `888744ecf4dc1f7b220ea9850c0f2bca0fa41c35`: patch SQL aplicado uma única vez em `uniconnect-test`; não reaplicar. Naquela validação, API local, autenticação real, dois canais privados e recusa de tópico de outro destinatário foram comprovados, mas envio, entrega de mensagens e recibos reais ainda não tinham sido ensaiados. As listas de implementação/aceite abaixo conservam esse contexto e não constituem aprovação operacional.
 
 ## Fluxo e fonte de verdade
 

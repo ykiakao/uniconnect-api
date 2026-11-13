@@ -1,5 +1,7 @@
 # FCM acadêmico — configuração manual no Portainer
 
+Referência documental de 13/11/2026: as instruções de montagem abaixo descrevem o **Compose publicado em `b633bdb`**, com bind mount. A adaptação local para volume externo `uniconnect-firebase-secrets` em `/run/secrets` ainda não está publicada e foi preservada fora do commit documental. Conferir a revisão efetivamente usada pelo operador; não aplicar instruções de montagem a uma variante diferente. Nenhum Docker, volume ou Portainer foi alterado nesta revisão.
+
 ## Escopo entregue
 
 - `POST /api/v1/tenants/:slug/notifications/devices` registra o token FCM do dispositivo para o usuário autenticado.

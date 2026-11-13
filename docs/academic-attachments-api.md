@@ -1,6 +1,8 @@
 **Anexos acadêmicos — contrato de integração HTTP (Fase A)**
 
-Implementado exclusivamente no backend. Não houve integração Flutter/React nem ativação remota. Este contrato estende a entrega textual existente; o frontend pode implementá-lo sem acessar tabelas, bucket ou credenciais administrativas.
+**Estado revisado em 13/11/2026:** contrato implementado na API e integrado ao Flutter, com materiais, arquivos de versões e recuperação de uploads. O fluxo sintético real em Supabase TEST já aprovou upload, confirmação, download com integridade, versões, idempotência, revisão e cancelamento em rodada anterior. Isso não comprova disponibilidade em qualquer stack atual nem autoriza operação em produção. O painel React não é cliente de anexos nesta fase. [Instruções atuais da API](../README.md) e [do Flutter](https://github.com/ykiakao/uniconnect-clients/blob/main/uniconnect_flutter_base/README.md).
+
+As seções operacionais finais preservam o registro histórico da preparação inicial, quando ainda não havia frontend nem ativação em TEST. Não interpretar esses marcos como o estado de integração de 13/11. Este contrato estende a entrega textual sem acesso administrativo do cliente ao banco ou bucket.
 
 **1. Base, autenticação e limites**
 
@@ -249,7 +251,7 @@ Envelope comum:
 
 Limites atuais das rotas novas: 30 requisições/minuto por usuário institucional e 120/minuto por IP por processo; validação simultânea de no máximo dois arquivos por processo e um por ator nesse processo. Leases SQL de 90 segundos coordenam instâncias. Limites em memória não são controle distribuído de tráfego; quotas e conjunto de anexos também são protegidos no banco. As rotas existentes de entrega mantêm seu limitador atual.
 
-**13. Operação, retenção e ativação futura**
+**13. Operação, retenção e preparação inicial (registro histórico)**
 
 Migration preparada: `supabase/migrations/20261112210356_academic_attachments.sql`. Três tabelas com RLS, FKs compostas e RPCs restritas ao servidor; sem grants de cliente. O fluxo textual histórico continua disponível, e a RPC nova incorpora arquivos na mesma transação. O tombstone conserva `activity_scope_id` para auditoria/limpeza após exclusão autorizada da atividade; `activity_id` pode ficar nulo sem apagar o registro do arquivo.
 
