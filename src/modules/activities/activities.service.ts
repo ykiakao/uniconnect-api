@@ -1,4 +1,6 @@
+import { notifyActivityPublished } from '../push/push.activities';
 import { AcademicAccess } from '../../shared/academic-access';
+import { env } from '../../config/env';
 import { ClassesRepository } from '../classes/classes.repository';
 import { HttpError } from '../../shared/http-error';
 import { Pagination, toPaginated } from '../../shared/pagination';
@@ -138,7 +140,25 @@ export class ActivitiesService {
     const activity=await this.activitiesRepository.findById({tenantId:params.tenantId,id:params.id});
     await this.ensureCanManageClassActivities({...params,classId:activity.classId});
     if (operation==='publish'&&params.currentUser.role!=='teacher') throw new HttpError(403,'FORBIDDEN','Somente docente atribuido pode publicar.');
-    return this.activitiesRepository.manage(params.tenantId,params.currentUser.id,operation,{id:params.id,payload:{expected_version:params.expectedVersion}});
+    const result = await this.activitiesRepository.manage(
+      params.tenantId,
+      params.currentUser.id,
+      operation,
+      { id: params.id, payload: { expected_version: params.expectedVersion } },
+    );
+
+    if (operation === 'publish' && env.FCM_ENABLED === 'true') {
+      // Publication already committed; push is best effort and must not delay it.
+      void notifyActivityPublished(
+        params.tenantId,
+        activity.classId,
+        params.id,
+      ).catch(() => {
+        console.error('[FCM] Falha ao notificar atividade publicada.');
+      });
+    }
+
+    return result;
   }
 
   private async ensureCanManageClassActivities(params: {

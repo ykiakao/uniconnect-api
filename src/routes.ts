@@ -4,6 +4,7 @@ import { Resources } from './modules/academic-structure/academic-structure.schem
 import { env } from './config/env';
 import { academicAttachmentsRoutes } from './modules/attachments/attachments.routes';
 import { RouteRegistry } from './observability/route-registry';
+import { pushDevicesRoutes } from './modules/push/push.routes';
 
 import { authRoutes } from './modules/auth/auth.routes';
 import { platformAuthRoutes } from './modules/auth/platform-auth.routes';
@@ -62,6 +63,7 @@ mount('/platform/institutions', platformInstitutionsRoutes, platformRoutes);
 mount('/tenants/:slug/notices', noticesRoutes);
 mount('/tenants/:slug', academicAttachmentsRoutes);
 mount('/tenants/:slug/conversations', conversationsRoutes);
+mount('/tenants/:slug/notifications/devices', pushDevicesRoutes);
 mount('/tenants/:slug/notifications', notificationsRoutes);
 mount('/tenants/:slug/activities/:activityId/submissions',activitySubmissionsRoutes);
 mount('/tenants/:slug/submissions',submissionsRoutes);

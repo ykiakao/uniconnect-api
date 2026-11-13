@@ -1,5 +1,7 @@
 process.env.NODE_ENV = 'test';
 process.env.API_VERSION = 'v1';
+process.env.FCM_ENABLED = 'false';
+process.env.FIREBASE_PROJECT_ID = 'uniconnect-b9c75';
 process.env.APP_ORIGIN =
   'http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:5173';
 process.env.SUPABASE_URL = 'https://test.supabase.co';

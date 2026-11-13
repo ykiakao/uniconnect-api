@@ -17,6 +17,8 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   API_VERSION: z.string().default('v1'),
   APP_ORIGIN: z.string().default(''),
+  FCM_ENABLED: z.enum(['true', 'false']).default('false'),
+  FIREBASE_PROJECT_ID: z.string().trim().min(1).optional(),
   ACADEMIC_ATTACHMENTS_MODE: z.enum(['disabled', 'read_only', 'enabled']).default('disabled'),
   ACADEMIC_ATTACHMENTS_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).default('academic-attachments'),
   ACADEMIC_ATTACHMENT_DOWNLOAD_TTL_SECONDS: z.coerce.number().int().min(15).max(60).default(60),
@@ -31,6 +33,9 @@ const envSchema = z.object({
   ACADEMIC_PROVIDER: z.enum(['disabled', 'demo', 'native']).default('disabled'),
   ACADEMIC_DEMO_TENANT_SLUG: z.string().trim().min(1).max(64).default('edukmais'),
 }).superRefine((value, context) => {
+  if (value.FCM_ENABLED === 'true' && !value.FIREBASE_PROJECT_ID) {
+    context.addIssue({ code: 'custom', path: ['FIREBASE_PROJECT_ID'], message: 'Configure o projeto Firebase ao habilitar FCM.' });
+  }
   for (const key of ['AUTH_RECOVERY_REDIRECT_URL', 'AUTH_INVITE_REDIRECT_URL'] as const) {
     if (value[key] && !isSafeAuthRedirectUrl(value[key], value.NODE_ENV)) {
       context.addIssue({ code: 'custom', path: [key], message: 'Configure HTTPS sem credenciais, query ou fragmento; HTTP loopback somente fora de producao.' });
