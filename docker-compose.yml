@@ -17,6 +17,9 @@ services:
       PORT: 3333
       API_VERSION: ${API_VERSION:-v1}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-uniconnect-b9c75}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
       SUPABASE_URL: ${SUPABASE_URL:?defina SUPABASE_URL}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?defina SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?defina SUPABASE_SERVICE_ROLE_KEY}
@@ -25,3 +28,10 @@ services:
       ACADEMIC_ATTACHMENTS_MODE: ${ACADEMIC_ATTACHMENTS_MODE:-disabled}
       ACADEMIC_ATTACHMENTS_BUCKET: ${ACADEMIC_ATTACHMENTS_BUCKET:-academic-attachments}
       ACADEMIC_ATTACHMENT_DOWNLOAD_TTL_SECONDS: ${ACADEMIC_ATTACHMENT_DOWNLOAD_TTL_SECONDS:-60}
+    volumes:
+      - type: bind
+        source: ${FIREBASE_ADMIN_CREDENTIALS_HOST_PATH:?defina o caminho absoluto do JSON Firebase Admin no host Docker}
+        target: /run/secrets/firebase-admin.json
+        read_only: true
+        bind:
+          create_host_path: false

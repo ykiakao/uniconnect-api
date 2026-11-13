@@ -90,6 +90,8 @@ O deploy atual é feito por **Portainer/Docker Compose**, não por Render ou Rai
 
 ### Docker / Portainer
 
+A preparação de FCM, os endpoints de dispositivo, a credencial privada montada somente para leitura e os passos manuais estão em [FCM no Portainer](docs/fcm-portainer.md). Antes de atualizar para esse Compose, configurar o caminho do arquivo no host; publicar código não autoriza deploy.
+
 O Compose mantém o serviço `uniconnect-api`, build local com Node 22, usuário de runtime `node` e mapeamento `${API_EXTERNAL_PORT:-3333}:3333`. A porta interna continua sendo 3333. O Docker healthcheck usa `GET /api/v1/health` (liveness). `GET /api/v1/health/ready` executa somente uma consulta de disponibilidade em `tenants`, responde 200 com `database.status=ok` ou 503 sem detalhes internos da dependência.
 
 As variáveis da stack incluem `API_EXTERNAL_PORT` (padrão 3333), `NODE_ENV` (padrão production), `API_VERSION` (padrão v1), `APP_ORIGIN`, `PLATFORM_ADMIN_AUTH_USER_IDS`, `ACADEMIC_PROVIDER` e as três variáveis obrigatórias `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Configure as origens reais explicitamente; a chave privilegiada fica somente no servidor. Nenhum segredo é incluído nos exemplos versionados.

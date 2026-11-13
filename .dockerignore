@@ -10,3 +10,16 @@ coverage
 *.log
 supabase/.temp
 supabase/.branches
+# Only build manifests/configuration JSON can enter the build context.
+**/*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+secrets
+credentials
+certs
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx

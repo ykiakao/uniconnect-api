@@ -54,3 +54,11 @@ cksca
 *.har
 docs/evidence/
 *gitleaks*.json
+
+# Firebase Admin credentials stay on the Docker host, outside the checkout.
+secrets/
+credentials/
+*firebase-adminsdk*.json
+*firebase-admin*.json
+*service-account*.json
+*service_account*.json
